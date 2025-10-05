@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Canvas Tab",
+  "version": "1.0",
+  "description": "A Notion-like canvas for your new tab page",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
