@@ -125,6 +125,9 @@ function renderCard(card) {
         cardEl.style.cursor = 'default';
     } else if (card.type === 'google') {
         cardEl.style.cursor = 'default';
+    } else if (card.type === 'gmail') {
+        cardEl.style.minWidth = '400px';
+        cardEl.style.maxWidth = '400px';
     }
     
     cardEl.appendChild(content);
@@ -139,6 +142,8 @@ function renderCard(card) {
         renderChatGPTCard(cardEl, card.id);
     } else if (card.type === 'google') {
         renderGoogleSearchCard(cardEl, card.id);
+    } else if (card.type === 'gmail') {
+        renderGmailCard(cardEl, card.id);
     }
     
     updateCanvasHeight();
@@ -306,6 +311,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'google') {
         closeAppModal();
         createGoogleSearchCard();
+    } else if (appType === 'gmail') {
+        closeAppModal();
+        authenticateGmail();
     }
 }
 
@@ -553,5 +561,178 @@ function renderGoogleSearchCard(cardEl, cardId) {
             e.preventDefault();
             searchGoogle();
         }
+    });
+}
+
+function authenticateGmail() {
+    chrome.storage.local.get(['gmailConnected'], (result) => {
+        if (result.gmailConnected) {
+            createGmailCard();
+        } else {
+            if (typeof chrome.identity !== 'undefined') {
+                chrome.identity.getAuthToken({ interactive: true }, (token) => {
+                    if (chrome.runtime.lastError || !token) {
+                        alert('Failed to authenticate with Gmail. Please try again.');
+                        return;
+                    }
+                    
+                    chrome.storage.local.set({ gmailToken: token, gmailConnected: true }, () => {
+                        createGmailCard();
+                    });
+                });
+            } else {
+                alert('Gmail authentication requires a valid OAuth client ID. Please check the setup instructions.');
+            }
+        }
+    });
+}
+
+function createGmailCard() {
+    const card = {
+        id: Date.now().toString(),
+        type: 'gmail',
+        x: window.innerWidth / 2 - 200,
+        y: window.innerHeight / 2 - 150,
+        content: ''
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+async function fetchGmailMessages(token) {
+    try {
+        const response = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=20', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch messages');
+        }
+        
+        const data = await response.json();
+        
+        if (!data.messages || data.messages.length === 0) {
+            return [];
+        }
+        
+        const messageDetails = await Promise.all(
+            data.messages.map(async (msg) => {
+                const msgResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (msgResponse.ok) {
+                    return await msgResponse.json();
+                }
+                return null;
+            })
+        );
+        
+        return messageDetails.filter(msg => msg !== null).map(msg => {
+            const headers = msg.payload.headers;
+            const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+            const subject = headers.find(h => h.name === 'Subject')?.value || '(No Subject)';
+            const date = headers.find(h => h.name === 'Date')?.value || '';
+            
+            return {
+                id: msg.id,
+                from: from,
+                subject: subject,
+                date: date,
+                snippet: msg.snippet
+            };
+        });
+    } catch (error) {
+        console.error('Gmail API error:', error);
+        return null;
+    }
+}
+
+function renderGmailCard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    content.innerHTML = '<div class="loading">Loading Gmail messages...</div>';
+    
+    chrome.storage.local.get(['gmailToken'], (result) => {
+        if (!result.gmailToken) {
+            content.innerHTML = `
+                <div class="error-message">Gmail token not found. Please reconnect.</div>
+                <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
+            `;
+            const btn = content.querySelector('.connect-btn');
+            btn.addEventListener('click', () => {
+                chrome.storage.local.remove(['gmailToken', 'gmailConnected'], () => {
+                    deleteCard(cardId);
+                    authenticateGmail();
+                });
+            });
+            return;
+        }
+        
+        fetchGmailMessages(result.gmailToken).then(messages => {
+            if (!messages) {
+                content.innerHTML = `
+                    <div class="error-message">Failed to load Gmail messages. Token may have expired.</div>
+                    <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
+                    <button class="connect-btn" style="margin-top: 8px; background: #9b9a97;">Retry</button>
+                `;
+                const reconnectBtn = content.querySelectorAll('.connect-btn')[0];
+                const retryBtn = content.querySelectorAll('.connect-btn')[1];
+                
+                reconnectBtn.addEventListener('click', () => {
+                    chrome.storage.local.remove(['gmailToken', 'gmailConnected'], () => {
+                        deleteCard(cardId);
+                        authenticateGmail();
+                    });
+                });
+                
+                retryBtn.addEventListener('click', () => {
+                    renderGmailCard(cardEl, cardId);
+                });
+                return;
+            }
+            
+            content.innerHTML = `
+                <div class="app-connected">✓ Connected to Gmail</div>
+                <div class="account-label">Last 20 Emails</div>
+                <div class="transactions-list" id="gmail-list-${cardId}" style="max-height: 400px; overflow-y: auto;"></div>
+            `;
+            
+            const emailList = content.querySelector(`#gmail-list-${cardId}`);
+            
+            if (messages.length === 0) {
+                emailList.innerHTML = '<div style="color: #9b9a97; font-size: 13px; padding: 8px 0;">No emails found</div>';
+            } else {
+                messages.forEach(email => {
+                    const emailEl = document.createElement('div');
+                    emailEl.className = 'transaction-item';
+                    emailEl.style.cursor = 'pointer';
+                    emailEl.style.flexDirection = 'column';
+                    emailEl.style.alignItems = 'flex-start';
+                    
+                    const fromMatch = email.from.match(/<(.+?)>/);
+                    const fromEmail = fromMatch ? fromMatch[1] : email.from;
+                    const fromName = email.from.replace(/<.+?>/, '').trim() || fromEmail;
+                    
+                    emailEl.innerHTML = `
+                        <div style="font-weight: 500; font-size: 13px; color: #37352f; margin-bottom: 2px;">${fromName}</div>
+                        <div style="font-size: 14px; color: #37352f; margin-bottom: 2px;">${email.subject}</div>
+                        <div style="font-size: 12px; color: #9b9a97;">${email.snippet}</div>
+                    `;
+                    
+                    emailEl.addEventListener('click', () => {
+                        window.open(`https://mail.google.com/mail/u/0/#inbox/${email.id}`, '_blank');
+                    });
+                    
+                    emailList.appendChild(emailEl);
+                });
+            }
+        });
     });
 }
