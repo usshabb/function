@@ -329,9 +329,11 @@ async function createMercuryCard() {
 
 async function fetchMercuryData(token) {
     try {
+        const authToken = token.startsWith('secret-token:') ? token : `secret-token:${token}`;
+        
         const accountsResponse = await fetch('https://api.mercury.com/api/v1/accounts', {
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -347,9 +349,9 @@ async function fetchMercuryData(token) {
             throw new Error('No checking account found');
         }
         
-        const transactionsResponse = await fetch(`https://api.mercury.com/api/v1/account/${checkingAccount.id}/transactions?limit=10`, {
+        const transactionsResponse = await fetch(`https://api.mercury.com/api/v1/account/${checkingAccount.id}/transactions`, {
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${authToken}`,
                 'Content-Type': 'application/json'
             }
         });
