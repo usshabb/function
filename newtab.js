@@ -419,7 +419,7 @@ function renderMercuryCard(cardEl, cardId) {
         content.innerHTML = `
             <div class="app-connected">✓ Connected to Mercury</div>
             <div class="account-label">${mercuryData.accountName}</div>
-            <div class="account-balance">$${(mercuryData.balance / 100).toFixed(2)}</div>
+            <div class="account-balance">$${mercuryData.balance.toFixed(2)}</div>
             <div class="account-label">Recent Transactions</div>
             <div class="transactions-list" id="transactions-${cardId}"></div>
         `;
@@ -433,7 +433,7 @@ function renderMercuryCard(cardEl, cardId) {
                 const transactionEl = document.createElement('div');
                 transactionEl.className = 'transaction-item';
                 
-                const amount = transaction.amount / 100;
+                const amount = transaction.amount;
                 const isPositive = amount > 0;
                 
                 transactionEl.innerHTML = `
