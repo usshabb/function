@@ -9,6 +9,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
 });
 
+function updateCanvasHeight() {
+    const canvas = document.getElementById('canvas');
+    if (cards.length === 0) {
+        canvas.style.minHeight = '100vh';
+        return;
+    }
+    
+    let maxBottom = window.innerHeight;
+    cards.forEach(card => {
+        const cardEl = document.querySelector(`[data-id="${card.id}"]`);
+        if (cardEl) {
+            const cardHeight = cardEl.offsetHeight;
+            const cardBottom = card.y + cardHeight + 100;
+            maxBottom = Math.max(maxBottom, cardBottom);
+        }
+    });
+    
+    canvas.style.minHeight = maxBottom + 'px';
+}
+
 function createCard(type, data = {}) {
     const card = {
         id: Date.now().toString(),
@@ -21,6 +41,7 @@ function createCard(type, data = {}) {
     cards.push(card);
     renderCard(card);
     saveCards();
+    updateCanvasHeight();
 }
 
 function renderCard(card) {
@@ -89,6 +110,7 @@ function renderCard(card) {
     cardEl.addEventListener('mousedown', startDrag);
     
     document.getElementById('canvas').appendChild(cardEl);
+    updateCanvasHeight();
 }
 
 function renderLinkInput(container, cardId) {
@@ -177,6 +199,7 @@ function stopDrag() {
         card.x = parseInt(draggedCard.style.left);
         card.y = parseInt(draggedCard.style.top);
         saveCards();
+        updateCanvasHeight();
     }
     
     draggedCard = null;
@@ -199,6 +222,7 @@ function deleteCard(cardId) {
         cardEl.remove();
     }
     saveCards();
+    updateCanvasHeight();
 }
 
 function saveCards() {
@@ -210,6 +234,7 @@ function loadCards() {
         if (result.cards) {
             cards = result.cards;
             cards.forEach(card => renderCard(card));
+            updateCanvasHeight();
         }
     });
 }
