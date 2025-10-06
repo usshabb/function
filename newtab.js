@@ -1,9 +1,11 @@
 let cards = [];
 let draggedCard = null;
 let offset = { x: 0, y: 0 };
+let tasks = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCards();
+    loadTasks();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
@@ -20,6 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('appModal').addEventListener('click', (e) => {
         if (e.target.id === 'appModal') {
             closeAppModal();
+        }
+    });
+    
+    document.getElementById('tasksToggle').addEventListener('click', toggleTasksDrawer);
+    document.getElementById('closeTasksDrawer').addEventListener('click', closeTasksDrawer);
+    document.getElementById('addTaskBtn').addEventListener('click', addTask);
+    document.getElementById('newTaskInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            addTask();
         }
     });
 });
@@ -735,4 +746,137 @@ function renderGmailCard(cardEl, cardId) {
             }
         });
     });
+}
+
+function toggleTasksDrawer() {
+    const drawer = document.getElementById('tasksDrawer');
+    drawer.classList.toggle('open');
+}
+
+function closeTasksDrawer() {
+    const drawer = document.getElementById('tasksDrawer');
+    drawer.classList.remove('open');
+}
+
+function loadTasks() {
+    chrome.storage.local.get(['tasks'], (result) => {
+        tasks = result.tasks || [];
+        renderTasks();
+    });
+}
+
+function saveTasks() {
+    chrome.storage.local.set({ tasks: tasks });
+}
+
+function addTask() {
+    const input = document.getElementById('newTaskInput');
+    const dateInput = document.getElementById('newTaskDate');
+    const taskText = input.value.trim();
+    
+    if (!taskText) {
+        return;
+    }
+    
+    const task = {
+        id: Date.now().toString(),
+        text: taskText,
+        dueDate: dateInput.value || null,
+        completed: false,
+        createdAt: new Date().toISOString()
+    };
+    
+    tasks.unshift(task);
+    saveTasks();
+    renderTasks();
+    
+    input.value = '';
+    dateInput.value = '';
+}
+
+function renderTasks() {
+    const tasksList = document.getElementById('tasksList');
+    
+    if (tasks.length === 0) {
+        tasksList.innerHTML = '<div style="color: #9b9a97; text-align: center; padding: 20px;">No tasks yet. Add one above!</div>';
+        return;
+    }
+    
+    tasksList.innerHTML = '';
+    
+    tasks.forEach(task => {
+        const taskEl = document.createElement('div');
+        taskEl.className = 'task-item';
+        
+        const checkbox = document.createElement('div');
+        checkbox.className = 'task-checkbox' + (task.completed ? ' completed' : '');
+        checkbox.addEventListener('click', () => toggleTaskCompletion(task.id));
+        
+        const details = document.createElement('div');
+        details.className = 'task-details';
+        
+        const text = document.createElement('div');
+        text.className = 'task-text' + (task.completed ? ' completed' : '');
+        text.textContent = task.text;
+        
+        details.appendChild(text);
+        
+        if (task.dueDate) {
+            const dueDate = document.createElement('div');
+            const dueDateObj = new Date(task.dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const isOverdue = dueDateObj < today && !task.completed;
+            
+            dueDate.className = 'task-due-date' + (isOverdue ? ' overdue' : '');
+            dueDate.textContent = 'Due: ' + formatDate(task.dueDate);
+            details.appendChild(dueDate);
+        }
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'task-delete';
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', () => deleteTask(task.id));
+        
+        taskEl.appendChild(checkbox);
+        taskEl.appendChild(details);
+        taskEl.appendChild(deleteBtn);
+        
+        tasksList.appendChild(taskEl);
+    });
+}
+
+function toggleTaskCompletion(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+        task.completed = !task.completed;
+        saveTasks();
+        renderTasks();
+    }
+}
+
+function deleteTask(taskId) {
+    tasks = tasks.filter(t => t.id !== taskId);
+    saveTasks();
+    renderTasks();
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    today.setHours(0, 0, 0, 0);
+    tomorrow.setHours(0, 0, 0, 0);
+    const dateObj = new Date(date);
+    dateObj.setHours(0, 0, 0, 0);
+    
+    if (dateObj.getTime() === today.getTime()) {
+        return 'Today';
+    } else if (dateObj.getTime() === tomorrow.getTime()) {
+        return 'Tomorrow';
+    } else {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
 }
