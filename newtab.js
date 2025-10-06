@@ -256,6 +256,25 @@ function loadCards() {
     chrome.storage.local.get(['cards'], (result) => {
         if (result.cards) {
             cards = result.cards;
+            
+            let needsSave = false;
+            cards.forEach(card => {
+                if (card.type === 'mercury' && card.content) {
+                    try {
+                        const oldData = JSON.parse(card.content);
+                        if (oldData.token) {
+                            card.content = '';
+                            needsSave = true;
+                        }
+                    } catch (e) {
+                    }
+                }
+            });
+            
+            if (needsSave) {
+                saveCards();
+            }
+            
             cards.forEach(card => renderCard(card));
             updateCanvasHeight();
         }
@@ -279,27 +298,27 @@ function handleAppSelection(appType) {
 function promptMercuryToken() {
     closeAppModal();
     
-    chrome.storage.local.get(['mercuryToken'], (result) => {
-        if (result.mercuryToken) {
-            createMercuryCard(result.mercuryToken);
+    chrome.storage.local.get(['mercuryConnected'], (result) => {
+        if (result.mercuryConnected) {
+            createMercuryCard();
         } else {
             const token = prompt('Enter your Mercury API token:');
             if (token && token.trim()) {
-                chrome.storage.local.set({ mercuryToken: token.trim() }, () => {
-                    createMercuryCard(token.trim());
+                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, () => {
+                    createMercuryCard();
                 });
             }
         }
     });
 }
 
-async function createMercuryCard(token) {
+async function createMercuryCard() {
     const card = {
         id: Date.now().toString(),
         type: 'mercury',
         x: window.innerWidth / 2 - 200,
         y: window.innerHeight / 2 - 150,
-        content: JSON.stringify({ token: token })
+        content: ''
     };
     
     cards.push(card);
@@ -356,24 +375,44 @@ function renderMercuryCard(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
     content.innerHTML = '<div class="loading">Loading Mercury data...</div>';
     
-    const card = cards.find(c => c.id === cardId);
-    const data = JSON.parse(card.content);
-    
-    fetchMercuryData(data.token).then(mercuryData => {
-        if (!mercuryData) {
+    chrome.storage.local.get(['mercuryToken'], (result) => {
+        if (!result.mercuryToken) {
             content.innerHTML = `
-                <div class="error-message">Failed to load Mercury data. Please check your API token.</div>
-                <button class="connect-btn" style="margin-top: 12px;">Update Token</button>
+                <div class="error-message">Mercury token not found. Please reconnect.</div>
+                <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
             `;
             const btn = content.querySelector('.connect-btn');
             btn.addEventListener('click', () => {
-                chrome.storage.local.remove('mercuryToken', () => {
+                chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
                     deleteCard(cardId);
                     promptMercuryToken();
                 });
             });
             return;
         }
+        
+        fetchMercuryData(result.mercuryToken).then(mercuryData => {
+            if (!mercuryData) {
+                content.innerHTML = `
+                    <div class="error-message">Failed to load Mercury data. This could be due to an invalid token, network issue, or API error.</div>
+                    <button class="connect-btn" style="margin-top: 12px;">Update Token</button>
+                    <button class="connect-btn" style="margin-top: 8px; background: #9b9a97;">Retry</button>
+                `;
+                const updateBtn = content.querySelectorAll('.connect-btn')[0];
+                const retryBtn = content.querySelectorAll('.connect-btn')[1];
+                
+                updateBtn.addEventListener('click', () => {
+                    chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
+                        deleteCard(cardId);
+                        promptMercuryToken();
+                    });
+                });
+                
+                retryBtn.addEventListener('click', () => {
+                    renderMercuryCard(cardEl, cardId);
+                });
+                return;
+            }
         
         content.innerHTML = `
             <div class="app-connected">✓ Connected to Mercury</div>
@@ -405,5 +444,6 @@ function renderMercuryCard(cardEl, cardId) {
                 transactionsList.appendChild(transactionEl);
             });
         }
+        });
     });
 }
