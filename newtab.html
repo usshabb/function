@@ -10,6 +10,24 @@
     <div class="toolbar">
         <button id="addNote" class="tool-btn">+ Note</button>
         <button id="addLink" class="tool-btn">+ Link</button>
+        <button id="addApp" class="tool-btn">+ Apps</button>
+    </div>
+    
+    <div id="appModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Connect an App</h2>
+                <button id="closeModal" class="close-btn">×</button>
+            </div>
+            <div class="app-list">
+                <div class="app-option" data-app="mercury">
+                    <div class="app-info">
+                        <div class="app-name">Mercury.com</div>
+                        <div class="app-description">Connect your Mercury bank account</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div id="canvas" class="canvas"></div>

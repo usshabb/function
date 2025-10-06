@@ -7,6 +7,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
+    document.getElementById('addApp').addEventListener('click', openAppModal);
+    document.getElementById('closeModal').addEventListener('click', closeAppModal);
+    
+    document.querySelectorAll('.app-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+            const appType = e.currentTarget.dataset.app;
+            handleAppSelection(appType);
+        });
+    });
+    
+    document.getElementById('appModal').addEventListener('click', (e) => {
+        if (e.target.id === 'appModal') {
+            closeAppModal();
+        }
+    });
 });
 
 function updateCanvasHeight() {
@@ -103,6 +118,9 @@ function renderCard(card) {
         } else {
             renderLinkInput(content, card.id);
         }
+    } else if (card.type === 'mercury') {
+        cardEl.style.minWidth = '350px';
+        cardEl.style.maxWidth = '350px';
     }
     
     cardEl.appendChild(content);
@@ -110,6 +128,11 @@ function renderCard(card) {
     cardEl.addEventListener('mousedown', startDrag);
     
     document.getElementById('canvas').appendChild(cardEl);
+    
+    if (card.type === 'mercury') {
+        renderMercuryCard(cardEl, card.id);
+    }
+    
     updateCanvasHeight();
 }
 
@@ -235,6 +258,152 @@ function loadCards() {
             cards = result.cards;
             cards.forEach(card => renderCard(card));
             updateCanvasHeight();
+        }
+    });
+}
+
+function openAppModal() {
+    document.getElementById('appModal').classList.add('active');
+}
+
+function closeAppModal() {
+    document.getElementById('appModal').classList.remove('active');
+}
+
+function handleAppSelection(appType) {
+    if (appType === 'mercury') {
+        promptMercuryToken();
+    }
+}
+
+function promptMercuryToken() {
+    closeAppModal();
+    
+    chrome.storage.local.get(['mercuryToken'], (result) => {
+        if (result.mercuryToken) {
+            createMercuryCard(result.mercuryToken);
+        } else {
+            const token = prompt('Enter your Mercury API token:');
+            if (token && token.trim()) {
+                chrome.storage.local.set({ mercuryToken: token.trim() }, () => {
+                    createMercuryCard(token.trim());
+                });
+            }
+        }
+    });
+}
+
+async function createMercuryCard(token) {
+    const card = {
+        id: Date.now().toString(),
+        type: 'mercury',
+        x: window.innerWidth / 2 - 200,
+        y: window.innerHeight / 2 - 150,
+        content: JSON.stringify({ token: token })
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+async function fetchMercuryData(token) {
+    try {
+        const accountsResponse = await fetch('https://api.mercury.com/api/v1/accounts', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!accountsResponse.ok) {
+            throw new Error('Failed to fetch accounts');
+        }
+        
+        const accountsData = await accountsResponse.json();
+        const checkingAccount = accountsData.accounts?.find(acc => acc.type === 'checking') || accountsData.accounts?.[0];
+        
+        if (!checkingAccount) {
+            throw new Error('No checking account found');
+        }
+        
+        const transactionsResponse = await fetch(`https://api.mercury.com/api/v1/account/${checkingAccount.id}/transactions?limit=10`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!transactionsResponse.ok) {
+            throw new Error('Failed to fetch transactions');
+        }
+        
+        const transactionsData = await transactionsResponse.json();
+        
+        return {
+            accountName: checkingAccount.name || 'My Checking Account',
+            balance: checkingAccount.availableBalance || checkingAccount.currentBalance || 0,
+            transactions: transactionsData.transactions?.slice(0, 10) || []
+        };
+    } catch (error) {
+        console.error('Mercury API error:', error);
+        return null;
+    }
+}
+
+function renderMercuryCard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    content.innerHTML = '<div class="loading">Loading Mercury data...</div>';
+    
+    const card = cards.find(c => c.id === cardId);
+    const data = JSON.parse(card.content);
+    
+    fetchMercuryData(data.token).then(mercuryData => {
+        if (!mercuryData) {
+            content.innerHTML = `
+                <div class="error-message">Failed to load Mercury data. Please check your API token.</div>
+                <button class="connect-btn" style="margin-top: 12px;">Update Token</button>
+            `;
+            const btn = content.querySelector('.connect-btn');
+            btn.addEventListener('click', () => {
+                chrome.storage.local.remove('mercuryToken', () => {
+                    deleteCard(cardId);
+                    promptMercuryToken();
+                });
+            });
+            return;
+        }
+        
+        content.innerHTML = `
+            <div class="app-connected">✓ Connected to Mercury</div>
+            <div class="account-label">${mercuryData.accountName}</div>
+            <div class="account-balance">$${(mercuryData.balance / 100).toFixed(2)}</div>
+            <div class="account-label">Recent Transactions</div>
+            <div class="transactions-list" id="transactions-${cardId}"></div>
+        `;
+        
+        const transactionsList = content.querySelector(`#transactions-${cardId}`);
+        
+        if (mercuryData.transactions.length === 0) {
+            transactionsList.innerHTML = '<div style="color: #9b9a97; font-size: 13px; padding: 8px 0;">No recent transactions</div>';
+        } else {
+            mercuryData.transactions.forEach(transaction => {
+                const transactionEl = document.createElement('div');
+                transactionEl.className = 'transaction-item';
+                
+                const amount = transaction.amount / 100;
+                const isPositive = amount > 0;
+                
+                transactionEl.innerHTML = `
+                    <div class="transaction-description">${transaction.description || transaction.counterpartyName || 'Transaction'}</div>
+                    <div class="transaction-amount ${isPositive ? 'positive' : 'negative'}">
+                        ${isPositive ? '+' : ''}$${Math.abs(amount).toFixed(2)}
+                    </div>
+                `;
+                
+                transactionsList.appendChild(transactionEl);
+            });
         }
     });
 }
