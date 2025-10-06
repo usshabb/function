@@ -5,7 +5,7 @@ let tasks = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCards();
-    loadTasks();
+    checkTasksEnabled();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
@@ -325,6 +325,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'gmail') {
         closeAppModal();
         authenticateGmail();
+    } else if (appType === 'tasks') {
+        closeAppModal();
+        enableTasks();
     }
 }
 
@@ -745,6 +748,25 @@ function renderGmailCard(cardEl, cardId) {
                 });
             }
         });
+    });
+}
+
+function enableTasks() {
+    chrome.storage.local.set({ tasksEnabled: true }, () => {
+        const toggle = document.getElementById('tasksToggle');
+        toggle.style.display = 'flex';
+        loadTasks();
+        toggleTasksDrawer();
+    });
+}
+
+function checkTasksEnabled() {
+    chrome.storage.local.get(['tasksEnabled'], (result) => {
+        if (result.tasksEnabled) {
+            const toggle = document.getElementById('tasksToggle');
+            toggle.style.display = 'flex';
+            loadTasks();
+        }
     });
 }
 
