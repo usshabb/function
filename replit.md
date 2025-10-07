@@ -12,6 +12,7 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 - Tasks: To-do list manager with due dates and checkboxes
 - Reminder: Set timed reminders with banner alerts at the top of the page
 - SSENSE: Browse curated fashion products in a 3x5 grid with images, prices, and clickable links
+- Weather: Current weather for your location with temperature, conditions, and forecast
 
 ## User Preferences
 
