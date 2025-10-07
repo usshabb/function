@@ -1,0 +1,55 @@
+"data": [
+        {
+            "brand": "OUR LEGACY",
+            "discount_percentage": 49.88,
+            "images": [
+                {
+                    "alt_text": "Purple & Brown Heusen Shirt",
+                    "url": "https://res.cloudinary.com/ssenseweb/image/upload/w_500,h_667,c_fill,q_auto:best/242803M192018_1.jpg"
+                }
+            ],
+            "link": "https://www.ssense.com/men/product/our-legacy/purple-and-brown-heusen-shirt/16239431",
+            "name": "Purple & Brown Heusen Shirt",
+            "original_price": 405.0,
+            "sale_price": 203.0,
+            "scraped_at": "2025-10-07T21:10:15.505762",
+            "sizes": [
+                "Check Product Page"
+            ]
+        },
+        {
+            "brand": "Rick Owens",
+            "discount_percentage": 55.0,
+            "images": [
+                {
+                    "alt_text": "Black Porterville Double T-Shirt",
+                    "url": "https://res.cloudinary.com/ssenseweb/image/upload/w_500,h_667,c_fill,q_auto:best/242232M213109_1.jpg"
+                }
+            ],
+            "link": "https://www.ssense.com/men/product/rick-owens/black-porterville-double-t-shirt/15851731",
+            "name": "Black Porterville Double T-Shirt",
+            "original_price": 440.0,
+            "sale_price": 198.0,
+            "scraped_at": "2025-10-07T21:10:15.505762",
+            "sizes": [
+                "Check Product Page"
+            ]
+        },
+        {
+            "brand": "Nudie Jeans",
+            "discount_percentage": 49.76,
+            "images": [
+                {
+                    "alt_text": "Black Lean Dean Jeans",
+                    "url": "https://res.cloudinary.com/ssenseweb/image/upload/w_500,h_667,c_fill,q_auto:best/242078M186031_1.jpg"
+                }
+            ],
+            "link": "https://www.ssense.com/men/product/nudie-jeans/black-lean-dean-jeans/15773081",
+            "name": "Black Lean Dean Jeans",
+            "original_price": 205.0,
+            "sale_price": 103.0,
+            "scraped_at": "2025-10-07T21:10:15.505762",
+            "sizes": [
+                "Check Product Page"
+            ]
+        },
