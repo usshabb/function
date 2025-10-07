@@ -142,6 +142,10 @@ function renderCard(card) {
         cardEl.style.minWidth = '350px';
         cardEl.style.maxWidth = '350px';
         cardEl.style.cursor = 'default';
+    } else if (card.type === 'ssense') {
+        cardEl.style.minWidth = '500px';
+        cardEl.style.maxWidth = '500px';
+        cardEl.style.cursor = 'default';
     }
     
     cardEl.appendChild(content);
@@ -162,6 +166,8 @@ function renderCard(card) {
         renderTasksCard(cardEl, card.id);
     } else if (card.type === 'reminder') {
         renderReminderCard(cardEl, card.id);
+    } else if (card.type === 'ssense') {
+        renderSSENSECard(cardEl, card.id);
     }
     
     updateCanvasHeight();
@@ -338,6 +344,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'reminder') {
         closeAppModal();
         createReminderCard();
+    } else if (appType === 'ssense') {
+        closeAppModal();
+        createSSENSECard();
     }
 }
 
@@ -1103,4 +1112,98 @@ function showReminderBanner(reminder) {
     banner.appendChild(closeBtn);
     
     bannersContainer.appendChild(banner);
+}
+
+function createSSENSECard() {
+    const card = {
+        id: Date.now().toString(),
+        type: 'ssense',
+        x: window.innerWidth / 2 - 250,
+        y: window.innerHeight / 2 - 200,
+        content: ''
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+async function fetchSSENSEProducts() {
+    try {
+        const response = await fetch('https://ssense-scrape-ushabbir.replit.app/api/products', {
+            method: 'GET',
+            headers: {
+                'X-API-KEY': '1234'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch SSENSE products');
+        }
+        
+        const data = await response.json();
+        return data.data || [];
+    } catch (error) {
+        console.error('Error fetching SSENSE products:', error);
+        return [];
+    }
+}
+
+async function renderSSENSECard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    
+    content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Loading products...</div>';
+    
+    const products = await fetchSSENSEProducts();
+    
+    if (products.length === 0) {
+        content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">No products available</div>';
+        return;
+    }
+    
+    const limitedProducts = products.slice(0, 15);
+    
+    content.innerHTML = '';
+    
+    const grid = document.createElement('div');
+    grid.className = 'ssense-grid';
+    
+    limitedProducts.forEach(product => {
+        const productCard = document.createElement('div');
+        productCard.className = 'ssense-product-card';
+        productCard.style.cursor = 'pointer';
+        
+        const img = document.createElement('img');
+        img.src = product.images[0]?.url || '';
+        img.alt = product.images[0]?.alt_text || product.name;
+        img.className = 'ssense-product-image';
+        
+        const name = document.createElement('div');
+        name.className = 'ssense-product-name';
+        name.textContent = product.name;
+        
+        const price = document.createElement('div');
+        price.className = 'ssense-product-price';
+        if (product.sale_price && product.sale_price < product.original_price) {
+            price.innerHTML = `
+                <span class="ssense-sale-price">$${product.sale_price}</span>
+                <span class="ssense-original-price">$${product.original_price}</span>
+            `;
+        } else {
+            price.textContent = `$${product.original_price}`;
+        }
+        
+        productCard.appendChild(img);
+        productCard.appendChild(name);
+        productCard.appendChild(price);
+        
+        productCard.addEventListener('click', () => {
+            window.open(product.link, '_blank');
+        });
+        
+        grid.appendChild(productCard);
+    });
+    
+    content.appendChild(grid);
 }
