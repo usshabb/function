@@ -10,6 +10,7 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 - Google Search: Quick search widget
 - Gmail: View last 20 emails (requires OAuth setup)
 - Tasks: To-do list manager with due dates and checkboxes
+- Reminder: Set timed reminders with banner alerts at the top of the page
 
 ## User Preferences
 

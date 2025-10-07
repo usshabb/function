@@ -2,10 +2,14 @@ let cards = [];
 let draggedCard = null;
 let offset = { x: 0, y: 0 };
 let tasks = [];
+let reminders = [];
+let reminderCheckInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCards();
     loadTasks();
+    loadReminders();
+    startReminderChecker();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
@@ -134,6 +138,10 @@ function renderCard(card) {
         cardEl.style.minWidth = '350px';
         cardEl.style.maxWidth = '350px';
         cardEl.style.cursor = 'default';
+    } else if (card.type === 'reminder') {
+        cardEl.style.minWidth = '350px';
+        cardEl.style.maxWidth = '350px';
+        cardEl.style.cursor = 'default';
     }
     
     cardEl.appendChild(content);
@@ -152,6 +160,8 @@ function renderCard(card) {
         renderGmailCard(cardEl, card.id);
     } else if (card.type === 'tasks') {
         renderTasksCard(cardEl, card.id);
+    } else if (card.type === 'reminder') {
+        renderReminderCard(cardEl, card.id);
     }
     
     updateCanvasHeight();
@@ -325,6 +335,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'tasks') {
         closeAppModal();
         createTasksCard();
+    } else if (appType === 'reminder') {
+        closeAppModal();
+        createReminderCard();
     }
 }
 
@@ -902,4 +915,192 @@ function formatDate(dateString) {
     } else {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
+}
+
+function createReminderCard() {
+    const card = {
+        id: Date.now().toString(),
+        type: 'reminder',
+        x: window.innerWidth / 2 - 175,
+        y: window.innerHeight / 2 - 150,
+        content: ''
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+function renderReminderCard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    
+    content.innerHTML = `
+        <div style="margin-bottom: 12px;">
+            <input type="text" id="reminder-text-${cardId}" placeholder="Reminder text..." style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
+            <input type="date" id="reminder-date-${cardId}" style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
+            <input type="time" id="reminder-time-${cardId}" style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
+            <button class="connect-btn" id="add-reminder-${cardId}">Add Reminder</button>
+        </div>
+        <div id="reminders-list-${cardId}" style="max-height: 300px; overflow-y: auto;"></div>
+    `;
+    
+    const textInput = content.querySelector(`#reminder-text-${cardId}`);
+    const dateInput = content.querySelector(`#reminder-date-${cardId}`);
+    const timeInput = content.querySelector(`#reminder-time-${cardId}`);
+    const addBtn = content.querySelector(`#add-reminder-${cardId}`);
+    const remindersList = content.querySelector(`#reminders-list-${cardId}`);
+    
+    const addReminder = () => {
+        const text = textInput.value.trim();
+        const date = dateInput.value;
+        const time = timeInput.value;
+        
+        if (!text || !date || !time) {
+            alert('Please fill in all fields');
+            return;
+        }
+        
+        const reminderDateTime = new Date(`${date}T${time}`);
+        
+        if (reminderDateTime <= new Date()) {
+            alert('Reminder time must be in the future');
+            return;
+        }
+        
+        const reminder = {
+            id: Date.now().toString(),
+            text: text,
+            dateTime: reminderDateTime.toISOString(),
+            triggered: false,
+            createdAt: new Date().toISOString()
+        };
+        
+        reminders.push(reminder);
+        saveReminders();
+        renderRemindersList(remindersList);
+        
+        textInput.value = '';
+        dateInput.value = '';
+        timeInput.value = '';
+    };
+    
+    addBtn.addEventListener('click', addReminder);
+    textInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            addReminder();
+        }
+    });
+    
+    renderRemindersList(remindersList);
+}
+
+function renderRemindersList(container) {
+    const activeReminders = reminders.filter(r => !r.triggered);
+    
+    if (activeReminders.length === 0) {
+        container.innerHTML = '<div style="color: #9b9a97; text-align: center; padding: 20px; font-size: 13px;">No active reminders</div>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    activeReminders.forEach(reminder => {
+        const reminderEl = document.createElement('div');
+        reminderEl.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 6px; margin-bottom: 6px; background: #f7f6f3;';
+        
+        const details = document.createElement('div');
+        details.style.cssText = 'flex: 1;';
+        
+        const text = document.createElement('div');
+        text.style.cssText = 'font-size: 14px; color: #37352f; margin-bottom: 4px; font-weight: 500;';
+        text.textContent = reminder.text;
+        details.appendChild(text);
+        
+        const dateTime = document.createElement('div');
+        const dt = new Date(reminder.dateTime);
+        dateTime.style.cssText = 'font-size: 12px; color: #9b9a97;';
+        dateTime.textContent = dt.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+        details.appendChild(dateTime);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.style.cssText = 'background: transparent; border: none; color: #9b9a97; cursor: pointer; font-size: 18px; padding: 0 4px; flex-shrink: 0;';
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', () => {
+            reminders = reminders.filter(r => r.id !== reminder.id);
+            saveReminders();
+            renderRemindersList(container);
+        });
+        
+        reminderEl.appendChild(details);
+        reminderEl.appendChild(deleteBtn);
+        
+        container.appendChild(reminderEl);
+    });
+}
+
+function loadReminders() {
+    chrome.storage.local.get(['reminders'], (result) => {
+        reminders = result.reminders || [];
+    });
+}
+
+function saveReminders() {
+    chrome.storage.local.set({ reminders: reminders });
+}
+
+function startReminderChecker() {
+    if (reminderCheckInterval) {
+        clearInterval(reminderCheckInterval);
+    }
+    
+    reminderCheckInterval = setInterval(() => {
+        const now = new Date();
+        
+        reminders.forEach(reminder => {
+            if (!reminder.triggered) {
+                const reminderTime = new Date(reminder.dateTime);
+                
+                if (now >= reminderTime) {
+                    reminder.triggered = true;
+                    saveReminders();
+                    showReminderBanner(reminder);
+                    
+                    document.querySelectorAll('[id^="reminders-list-"]').forEach(list => {
+                        renderRemindersList(list);
+                    });
+                }
+            }
+        });
+    }, 1000);
+}
+
+function showReminderBanner(reminder) {
+    const bannersContainer = document.getElementById('reminderBanners');
+    
+    const banner = document.createElement('div');
+    banner.className = 'reminder-banner';
+    banner.dataset.reminderId = reminder.id;
+    
+    const content = document.createElement('div');
+    content.className = 'reminder-banner-content';
+    content.textContent = reminder.text;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'reminder-banner-close';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', () => {
+        banner.remove();
+    });
+    
+    banner.appendChild(content);
+    banner.appendChild(closeBtn);
+    
+    bannersContainer.appendChild(banner);
 }

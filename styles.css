@@ -12,6 +12,61 @@ body {
     min-height: 100vh;
 }
 
+.reminder-banners {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.reminder-banner {
+    background: #2383e2;
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.reminder-banner-content {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.reminder-banner-close {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 8px;
+    margin-left: 16px;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.reminder-banner-close:hover {
+    opacity: 1;
+}
+
 .toolbar {
     position: fixed;
     top: 20px;
