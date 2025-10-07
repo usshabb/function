@@ -2,7 +2,14 @@
 
 ## Overview
 
-Canvas Tab is a browser extension that replaces the default new tab page with a Notion-like canvas interface. Users can create and position draggable cards (notes and links) on an infinite canvas workspace. The extension provides a minimalist, clean interface for organizing information directly in the browser's new tab experience.
+Canvas Tab is a browser extension that replaces the default new tab page with a Notion-like canvas interface. Users can create and position draggable cards (notes, links, and app widgets) on an infinite canvas workspace. The extension provides a minimalist, clean interface for organizing information directly in the browser's new tab experience.
+
+**Available Apps:**
+- Mercury: Banking widget showing account balance and transactions
+- ChatGPT: Quick access to ask ChatGPT questions
+- Google Search: Quick search widget
+- Gmail: View last 20 emails (requires OAuth setup)
+- Tasks: To-do list manager with due dates and checkboxes
 
 ## User Preferences
 

@@ -5,7 +5,7 @@ let tasks = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCards();
-    checkTasksEnabled();
+    loadTasks();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
@@ -22,15 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('appModal').addEventListener('click', (e) => {
         if (e.target.id === 'appModal') {
             closeAppModal();
-        }
-    });
-    
-    document.getElementById('tasksToggle').addEventListener('click', toggleTasksDrawer);
-    document.getElementById('closeTasksDrawer').addEventListener('click', closeTasksDrawer);
-    document.getElementById('addTaskBtn').addEventListener('click', addTask);
-    document.getElementById('newTaskInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            addTask();
         }
     });
 });
@@ -139,6 +130,10 @@ function renderCard(card) {
     } else if (card.type === 'gmail') {
         cardEl.style.minWidth = '400px';
         cardEl.style.maxWidth = '400px';
+    } else if (card.type === 'tasks') {
+        cardEl.style.minWidth = '350px';
+        cardEl.style.maxWidth = '350px';
+        cardEl.style.cursor = 'default';
     }
     
     cardEl.appendChild(content);
@@ -155,6 +150,8 @@ function renderCard(card) {
         renderGoogleSearchCard(cardEl, card.id);
     } else if (card.type === 'gmail') {
         renderGmailCard(cardEl, card.id);
+    } else if (card.type === 'tasks') {
+        renderTasksCard(cardEl, card.id);
     }
     
     updateCanvasHeight();
@@ -327,7 +324,7 @@ function handleAppSelection(appType) {
         authenticateGmail();
     } else if (appType === 'tasks') {
         closeAppModal();
-        enableTasks();
+        createTasksCard();
     }
 }
 
@@ -751,96 +748,99 @@ function renderGmailCard(cardEl, cardId) {
     });
 }
 
-function enableTasks() {
-    chrome.storage.local.set({ tasksEnabled: true }, () => {
-        const toggle = document.getElementById('tasksToggle');
-        toggle.style.display = 'flex';
-        loadTasks();
-        toggleTasksDrawer();
-    });
-}
-
-function checkTasksEnabled() {
-    chrome.storage.local.get(['tasksEnabled'], (result) => {
-        if (result.tasksEnabled) {
-            const toggle = document.getElementById('tasksToggle');
-            toggle.style.display = 'flex';
-            loadTasks();
-        }
-    });
-}
-
-function toggleTasksDrawer() {
-    const drawer = document.getElementById('tasksDrawer');
-    drawer.classList.toggle('open');
-}
-
-function closeTasksDrawer() {
-    const drawer = document.getElementById('tasksDrawer');
-    drawer.classList.remove('open');
-}
-
-function loadTasks() {
-    chrome.storage.local.get(['tasks'], (result) => {
-        tasks = result.tasks || [];
-        renderTasks();
-    });
-}
-
-function saveTasks() {
-    chrome.storage.local.set({ tasks: tasks });
-}
-
-function addTask() {
-    const input = document.getElementById('newTaskInput');
-    const dateInput = document.getElementById('newTaskDate');
-    const taskText = input.value.trim();
-    
-    if (!taskText) {
-        return;
-    }
-    
-    const task = {
+function createTasksCard() {
+    const card = {
         id: Date.now().toString(),
-        text: taskText,
-        dueDate: dateInput.value || null,
-        completed: false,
-        createdAt: new Date().toISOString()
+        type: 'tasks',
+        x: window.innerWidth / 2 - 175,
+        y: window.innerHeight / 2 - 150,
+        content: ''
     };
     
-    tasks.unshift(task);
-    saveTasks();
-    renderTasks();
-    
-    input.value = '';
-    dateInput.value = '';
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
 }
 
-function renderTasks() {
-    const tasksList = document.getElementById('tasksList');
+function renderTasksCard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
     
+    content.innerHTML = `
+        <div style="margin-bottom: 12px;">
+            <input type="text" id="task-input-${cardId}" placeholder="Add a new task..." style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
+            <input type="date" id="task-date-${cardId}" style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
+            <button class="connect-btn" id="add-task-${cardId}">Add Task</button>
+        </div>
+        <div id="tasks-list-${cardId}" style="max-height: 400px; overflow-y: auto;"></div>
+    `;
+    
+    const input = content.querySelector(`#task-input-${cardId}`);
+    const dateInput = content.querySelector(`#task-date-${cardId}`);
+    const addBtn = content.querySelector(`#add-task-${cardId}`);
+    const tasksList = content.querySelector(`#tasks-list-${cardId}`);
+    
+    const addTask = () => {
+        const taskText = input.value.trim();
+        if (!taskText) return;
+        
+        const task = {
+            id: Date.now().toString(),
+            text: taskText,
+            dueDate: dateInput.value || null,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+        
+        tasks.unshift(task);
+        saveTasks();
+        renderTasksList(tasksList);
+        
+        input.value = '';
+        dateInput.value = '';
+    };
+    
+    addBtn.addEventListener('click', addTask);
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            addTask();
+        }
+    });
+    
+    renderTasksList(tasksList);
+}
+
+function renderTasksList(container) {
     if (tasks.length === 0) {
-        tasksList.innerHTML = '<div style="color: #9b9a97; text-align: center; padding: 20px;">No tasks yet. Add one above!</div>';
+        container.innerHTML = '<div style="color: #9b9a97; text-align: center; padding: 20px; font-size: 13px;">No tasks yet</div>';
         return;
     }
     
-    tasksList.innerHTML = '';
+    container.innerHTML = '';
     
     tasks.forEach(task => {
         const taskEl = document.createElement('div');
-        taskEl.className = 'task-item';
+        taskEl.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 6px; margin-bottom: 6px; background: #f7f6f3; transition: background 0.2s;';
+        taskEl.onmouseover = () => taskEl.style.background = '#edece9';
+        taskEl.onmouseout = () => taskEl.style.background = '#f7f6f3';
         
         const checkbox = document.createElement('div');
-        checkbox.className = 'task-checkbox' + (task.completed ? ' completed' : '');
-        checkbox.addEventListener('click', () => toggleTaskCompletion(task.id));
+        checkbox.style.cssText = `width: 18px; height: 18px; border: 2px solid ${task.completed ? '#2383e2' : '#e3e2e0'}; border-radius: 4px; cursor: pointer; flex-shrink: 0; margin-top: 2px; background: ${task.completed ? '#2383e2' : 'transparent'}; position: relative; transition: all 0.2s;`;
+        if (task.completed) {
+            checkbox.innerHTML = '<div style="color: white; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px;">✓</div>';
+        }
+        checkbox.addEventListener('click', () => {
+            task.completed = !task.completed;
+            saveTasks();
+            renderTasksList(container);
+        });
         
         const details = document.createElement('div');
-        details.className = 'task-details';
+        details.style.cssText = 'flex: 1;';
         
         const text = document.createElement('div');
-        text.className = 'task-text' + (task.completed ? ' completed' : '');
+        text.style.cssText = `font-size: 14px; color: ${task.completed ? '#9b9a97' : '#37352f'}; margin-bottom: 4px; ${task.completed ? 'text-decoration: line-through;' : ''}`;
         text.textContent = task.text;
-        
         details.appendChild(text);
         
         if (task.dueDate) {
@@ -850,37 +850,38 @@ function renderTasks() {
             today.setHours(0, 0, 0, 0);
             const isOverdue = dueDateObj < today && !task.completed;
             
-            dueDate.className = 'task-due-date' + (isOverdue ? ' overdue' : '');
+            dueDate.style.cssText = `font-size: 12px; color: ${isOverdue ? '#d93025' : '#9b9a97'}; ${isOverdue ? 'font-weight: 500;' : ''}`;
             dueDate.textContent = 'Due: ' + formatDate(task.dueDate);
             details.appendChild(dueDate);
         }
         
         const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'task-delete';
+        deleteBtn.style.cssText = 'background: transparent; border: none; color: #9b9a97; cursor: pointer; font-size: 18px; padding: 0 4px; flex-shrink: 0; transition: color 0.2s;';
         deleteBtn.textContent = '×';
-        deleteBtn.addEventListener('click', () => deleteTask(task.id));
+        deleteBtn.onmouseover = () => deleteBtn.style.color = '#d93025';
+        deleteBtn.onmouseout = () => deleteBtn.style.color = '#9b9a97';
+        deleteBtn.addEventListener('click', () => {
+            tasks = tasks.filter(t => t.id !== task.id);
+            saveTasks();
+            renderTasksList(container);
+        });
         
         taskEl.appendChild(checkbox);
         taskEl.appendChild(details);
         taskEl.appendChild(deleteBtn);
         
-        tasksList.appendChild(taskEl);
+        container.appendChild(taskEl);
     });
 }
 
-function toggleTaskCompletion(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-        task.completed = !task.completed;
-        saveTasks();
-        renderTasks();
-    }
+function loadTasks() {
+    chrome.storage.local.get(['tasks'], (result) => {
+        tasks = result.tasks || [];
+    });
 }
 
-function deleteTask(taskId) {
-    tasks = tasks.filter(t => t.id !== taskId);
-    saveTasks();
-    renderTasks();
+function saveTasks() {
+    chrome.storage.local.set({ tasks: tasks });
 }
 
 function formatDate(dateString) {
