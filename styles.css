@@ -648,3 +648,55 @@ body {
     font-size: 10px;
     font-weight: 400;
 }
+
+.weather-container {
+    padding: 16px;
+    text-align: center;
+}
+
+.weather-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.weather-icon {
+    font-size: 48px;
+}
+
+.weather-temp {
+    font-size: 36px;
+    font-weight: 600;
+    color: #37352f;
+}
+
+.weather-description {
+    font-size: 16px;
+    color: #37352f;
+    margin-bottom: 16px;
+}
+
+.weather-details {
+    display: flex;
+    justify-content: space-around;
+    padding-top: 12px;
+    border-top: 1px solid #e3e2e0;
+}
+
+.weather-detail {
+    text-align: center;
+}
+
+.weather-detail-label {
+    font-size: 11px;
+    color: #9b9a97;
+    margin-bottom: 4px;
+}
+
+.weather-detail-value {
+    font-size: 14px;
+    color: #37352f;
+    font-weight: 500;
+}

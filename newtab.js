@@ -146,6 +146,10 @@ function renderCard(card) {
         cardEl.style.minWidth = '500px';
         cardEl.style.maxWidth = '500px';
         cardEl.style.cursor = 'default';
+    } else if (card.type === 'weather') {
+        cardEl.style.minWidth = '300px';
+        cardEl.style.maxWidth = '300px';
+        cardEl.style.cursor = 'default';
     }
     
     cardEl.appendChild(content);
@@ -168,6 +172,8 @@ function renderCard(card) {
         renderReminderCard(cardEl, card.id);
     } else if (card.type === 'ssense') {
         renderSSENSECard(cardEl, card.id);
+    } else if (card.type === 'weather') {
+        renderWeatherCard(cardEl, card.id);
     }
     
     updateCanvasHeight();
@@ -347,6 +353,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'ssense') {
         closeAppModal();
         createSSENSECard();
+    } else if (appType === 'weather') {
+        closeAppModal();
+        createWeatherCard();
     }
 }
 
@@ -1206,4 +1215,121 @@ async function renderSSENSECard(cardEl, cardId) {
     });
     
     content.appendChild(grid);
+}
+
+function createWeatherCard() {
+    const card = {
+        id: Date.now().toString(),
+        type: 'weather',
+        x: window.innerWidth / 2 - 150,
+        y: window.innerHeight / 2 - 100,
+        content: ''
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+async function fetchWeatherData(latitude, longitude) {
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch weather data');
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching weather data:', error);
+        return null;
+    }
+}
+
+function getWeatherDescription(weatherCode) {
+    const weatherCodes = {
+        0: '☀️ Clear',
+        1: '🌤️ Mainly Clear',
+        2: '⛅ Partly Cloudy',
+        3: '☁️ Overcast',
+        45: '🌫️ Foggy',
+        48: '🌫️ Foggy',
+        51: '🌦️ Light Drizzle',
+        53: '🌦️ Drizzle',
+        55: '🌧️ Heavy Drizzle',
+        61: '🌧️ Light Rain',
+        63: '🌧️ Rain',
+        65: '🌧️ Heavy Rain',
+        71: '🌨️ Light Snow',
+        73: '🌨️ Snow',
+        75: '🌨️ Heavy Snow',
+        77: '❄️ Snow Grains',
+        80: '🌦️ Light Showers',
+        81: '🌧️ Showers',
+        82: '🌧️ Heavy Showers',
+        85: '🌨️ Snow Showers',
+        86: '🌨️ Heavy Snow Showers',
+        95: '⛈️ Thunderstorm',
+        96: '⛈️ Thunderstorm with Hail',
+        99: '⛈️ Heavy Thunderstorm'
+    };
+    
+    return weatherCodes[weatherCode] || '🌤️ Unknown';
+}
+
+async function renderWeatherCard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    
+    content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Getting location...</div>';
+    
+    if (!navigator.geolocation) {
+        content.innerHTML = '<div style="text-align: center; padding: 20px; color: #d93025;">Location not supported</div>';
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const { latitude, longitude } = position.coords;
+            
+            content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Loading weather...</div>';
+            
+            const weatherData = await fetchWeatherData(latitude, longitude);
+            
+            if (!weatherData) {
+                content.innerHTML = '<div style="text-align: center; padding: 20px; color: #d93025;">Failed to load weather</div>';
+                return;
+            }
+            
+            const current = weatherData.current_weather;
+            const daily = weatherData.daily;
+            const weatherDesc = getWeatherDescription(current.weathercode);
+            
+            content.innerHTML = `
+                <div class="weather-container">
+                    <div class="weather-main">
+                        <div class="weather-icon">${weatherDesc.split(' ')[0]}</div>
+                        <div class="weather-temp">${Math.round(current.temperature)}°C</div>
+                    </div>
+                    <div class="weather-description">${weatherDesc.substring(weatherDesc.indexOf(' ') + 1)}</div>
+                    <div class="weather-details">
+                        <div class="weather-detail">
+                            <div class="weather-detail-label">Wind</div>
+                            <div class="weather-detail-value">${Math.round(current.windspeed)} km/h</div>
+                        </div>
+                        <div class="weather-detail">
+                            <div class="weather-detail-label">High/Low</div>
+                            <div class="weather-detail-value">${Math.round(daily.temperature_2m_max[0])}° / ${Math.round(daily.temperature_2m_min[0])}°</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        },
+        (error) => {
+            content.innerHTML = '<div style="text-align: center; padding: 20px; color: #d93025;">Location permission denied</div>';
+        }
+    );
 }
