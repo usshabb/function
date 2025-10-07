@@ -11,6 +11,7 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 - Gmail: View last 20 emails (requires OAuth setup)
 - Tasks: To-do list manager with due dates and checkboxes
 - Reminder: Set timed reminders with banner alerts at the top of the page
+- SSENSE: Browse curated fashion products in a 3x5 grid with images, prices, and clickable links
 
 ## User Preferences
 
