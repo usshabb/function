@@ -13,7 +13,7 @@ body {
 }
 
 .reminder-banners {
-    position: fixed;
+    position: relative;
     top: 0;
     left: 0;
     right: 0;
@@ -24,13 +24,12 @@ body {
 }
 
 .reminder-banner {
-    background: #2383e2;
+    background: #000;
     color: white;
-    padding: 16px 20px;
+    padding: 10px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     animation: slideDown 0.3s ease;
 }
 
@@ -47,19 +46,19 @@ body {
 
 .reminder-banner-content {
     flex: 1;
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 14px;
+    font-weight: 400;
 }
 
 .reminder-banner-close {
     background: transparent;
     border: none;
     color: white;
-    font-size: 24px;
+    font-size: 20px;
     cursor: pointer;
     padding: 0 8px;
     margin-left: 16px;
-    opacity: 0.9;
+    opacity: 0.8;
     transition: opacity 0.2s;
 }
 
