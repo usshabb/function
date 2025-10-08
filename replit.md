@@ -14,6 +14,7 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 - SSENSE: Browse curated fashion products in a 3x5 grid with images, prices, and clickable links
 - Weather: Current weather for your location with temperature, conditions, and forecast
 - Top Sites: Ranked list of top 20 most visited websites from past 7 days with logos and visit counts. Users can star/pin favorite sites to keep them at the top while preserving original rank numbers for unstarred sites
+- RSS Reader: Follow tech blogs and news sources with latest 5 articles displayed. Starts with 5 default feeds (TechCrunch, The Verge, Hacker News, Ars Technica, Wired). Users can add/remove custom RSS feeds via the Manage Feeds interface
 
 ## User Preferences
 
@@ -96,6 +97,28 @@ Card {
 - Updates card position in real-time and persists on drop
 - Pros: Full control over drag behavior and visual feedback
 - Cons: Touch device support would require additional event handlers
+
+### RSS Reader Implementation
+
+**Feed Fetching and Parsing**
+- Uses CORS proxy (https://api.cors.lol/?url=) to fetch RSS feeds from external sources
+- Parses XML using browser's native DOMParser API
+- Extracts article titles, links, and publication dates from RSS items
+- Combines articles from all feeds and sorts by date (newest first)
+- Displays top 5 most recent articles across all sources
+
+**Feed Management**
+- Each RSS card stores its own feed list in chrome.storage.local using card ID as key
+- Default feeds: TechCrunch, The Verge, Hacker News, Ars Technica, Wired
+- Users can add custom RSS feeds by providing name and URL
+- Users can remove unwanted feeds from their collection
+- Feed customizations persist across browser sessions
+
+**Article Display**
+- Shows article title, source, and relative time ("2 hours ago", "Yesterday", etc.)
+- Articles are clickable and open in new browser tabs
+- Clean card-based layout with hover effects
+- "Manage Feeds" button toggles between article view and feed management interface
 
 ## External Dependencies
 
