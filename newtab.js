@@ -371,6 +371,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'history') {
         closeAppModal();
         createHistoryCard();
+    } else if (appType === 'rss') {
+        closeAppModal();
+        createRssCard();
     }
 }
 
@@ -1354,6 +1357,21 @@ function createHistoryCard() {
         id: Date.now().toString(),
         type: 'history',
         x: window.innerWidth / 2 - 175,
+        y: window.innerHeight / 2 - 150,
+        content: ''
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+function createRssCard() {
+    const card = {
+        id: Date.now().toString(),
+        type: 'rss',
+        x: window.innerWidth / 2 - 225,
         y: window.innerHeight / 2 - 150,
         content: ''
     };
