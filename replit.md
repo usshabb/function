@@ -43,21 +43,49 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 
-**Chrome Storage API**
-- Uses `chrome.storage` API for persistent data storage
-- Cards are stored as JSON array with properties: id, type, x/y coordinates, and content
-- Chosen over localStorage for better Chrome extension integration and sync capabilities
-- Pros: Native extension API, potential for sync across devices
-- Cons: Requires explicit permission in manifest
+**Firebase Cloud Storage with Multi-Device Sync**
+- **October 2025**: Migrated from local-only Chrome storage to Firebase Firestore for cloud synchronization
+- Users can sign in with Google to sync their workspace across all devices
+- Firestore structure:
+  - `/users/{uid}/cards/` - All user cards
+  - `/users/{uid}/tasks/` - Tasks from Tasks app
+  - `/users/{uid}/reminders/` - Reminders from Reminder app
+  - `/users/{uid}/credentials/tokens` - Encrypted API credentials (Mercury, etc.)
+- Real-time listeners sync changes instantly across devices
+- Fallback to Chrome local storage for anonymous (non-logged-in) users
+- One-time migration automatically transfers local data to cloud on first login
+- Pros: Cloud backup, multi-device sync, real-time collaboration potential
+- Cons: Requires internet connection, external Firebase dependency
+
+**Authentication Flow**
+- Google OAuth via Firebase Authentication
+- Login button in toolbar for easy access
+- User email displayed when logged in with logout option
+- Anonymous users can still use extension with local storage only
+- Migration from local to cloud happens transparently on first login
 
 **Data Model**
 ```
 Card {
   id: string (timestamp-based)
-  type: 'note' | 'link'
+  type: 'note' | 'link' | 'mercury' | 'chatgpt' | 'google' | 'gmail' | 'tasks' | 'reminder' | 'ssense' | 'weather'
   x: number (pixel position)
   y: number (pixel position)  
-  content: string
+  content: string (varies by card type)
+}
+
+Task {
+  id: string (timestamp-based)
+  text: string
+  completed: boolean
+  dueDate: string (ISO date)
+}
+
+Reminder {
+  id: string (timestamp-based)
+  text: string
+  dateTime: string (ISO datetime)
+  triggered: boolean
 }
 ```
 
@@ -99,15 +127,25 @@ Card {
 ## External Dependencies
 
 **Chrome Extension APIs**
-- `chrome.storage`: For persisting card data across sessions
+- `chrome.storage`: For persisting card data across sessions (fallback for anonymous users)
 - `chrome_url_overrides`: To replace the new tab page
 
-**No Third-Party Libraries**
-- Project intentionally avoids external dependencies
-- All functionality implemented with vanilla JavaScript
-- Rationale: Minimize load time, reduce security surface area, simplify distribution
+**Firebase Services (Added October 2025)**
+- Firebase Authentication: Google OAuth sign-in
+- Firebase Firestore: Cloud database for real-time multi-device sync
+- Firebase SDK v11.0.1 (modular imports)
+- Configuration stored in Replit Secrets: `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`, `FIREBASE_APP_ID`
+- Rationale: Enable cross-device synchronization and cloud backup
+
+**Third-Party APIs**
+- Mercury API: Banking data integration
+- Open-Meteo API: Weather data (free, no API key required)
+- SSENSE API: Fashion products (custom endpoint)
+- Vanilla JavaScript implementation for all other features
+- Rationale: Minimize load time while enabling powerful integrations
 
 **Browser Compatibility**
 - Designed specifically for Chromium-based browsers (Chrome, Edge, Brave, etc.)
-- Uses modern CSS (flexbox, CSS variables if present) and ES6+ JavaScript
+- Uses modern CSS (flexbox, CSS variables) and ES6+ JavaScript with async/await
+- Firebase requires modern browser with ES6 module support
 - Not compatible with Firefox or Safari without manifest adjustments
