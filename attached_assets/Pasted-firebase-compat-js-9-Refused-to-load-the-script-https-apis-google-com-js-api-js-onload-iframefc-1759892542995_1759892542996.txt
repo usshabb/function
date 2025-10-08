@@ -1,0 +1,19 @@
+firebase-compat.js:9 Refused to load the script 'https://apis.google.com/js/api.js?onload=__iframefcb125583' because it violates the following Content Security Policy directive: "script-src 'self'". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+
+firebase-compat.js:9 Refused to load the script 'https://apis.google.com/js/api.js?onload=__iframefcb125583' because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+newtab.js:75 Login error: FirebaseError: Firebase: Error (auth/internal-error).
+    at fi (firebase-compat.js:9:23634)
+    at hi (firebase-compat.js:9:23188)
+    at t.onerror (firebase-compat.js:9:56716)
+firebase-compat.js:9 Refused to load the script 'https://apis.google.com/js/api.js?onload=__iframefcb377269' because it violates the following Content Security Policy directive: "script-src 'self'". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+firebase-compat.js:9 Refused to load the script 'https://apis.google.com/js/api.js?onload=__iframefcb377269' because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+newtab.js:75 Login error: FirebaseError: Firebase: Error (auth/internal-error).
+    at fi (firebase-compat.js:9:23634)
+    at hi (firebase-compat.js:9:23188)
+    at t.onerror (firebase-compat.js:9:56716)
+firebase-compat.js:9 Refused to load the script 'https://apis.google.com/js/api.js?onload=__iframefcb395142' because it violates the following Content Security Policy directive: "script-src 'self'". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+firebase-compat.js:9 Refused to load the script 'https://apis.google.com/js/api.js?onload=__iframefcb395142' because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+newtab.js:75 Login error: FirebaseError: Firebase: Error (auth/internal-error).
+    at fi (firebase-compat.js:9:23634)
+    at hi (firebase-compat.js:9:23188)
+    at t.onerror (firebase-compat.js:9:56716)
