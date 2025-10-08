@@ -5,7 +5,7 @@ let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
 
-const API_URL = 'https://76d9489c-0e19-4d83-beab-8f54819c405c-00-2y5fxagw85mdi.kirk.replit.dev';
+const API_URL = 'https://76d9489c-0e19-4d83-beab-8f54819c405c-00-2y5fxagw85mdi.kirk.replit.dev:3000';
 
 let syncTimeout = null;
 let currentUserId = null;

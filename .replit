@@ -13,23 +13,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Backend"
-
-[[workflows.workflow]]
-name = "Server"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python -m http.server 5000"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow]]
 name = "Backend"
@@ -52,12 +36,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 44045
-externalPort = 3000
+localPort = 42035
+externalPort = 3001
 
 [[ports]]
-localPort = 45807
-externalPort = 3001
+localPort = 44045
+externalPort = 3000
 
 [nix]
 channel = "stable-25_05"

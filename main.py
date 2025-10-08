@@ -1,15 +1,14 @@
 import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "supports_credentials": True
+}})
 
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
@@ -18,10 +17,11 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
 }
 
+from models import db, User, UserState, UserToken
+
 db.init_app(app)
 
 with app.app_context():
-    import models
     db.create_all()
 
 @app.route('/health', methods=['GET'])
@@ -40,9 +40,9 @@ def create_or_update_user():
         if not user_id or not email:
             return jsonify({"error": "user_id and email are required"}), 400
         
-        user = models.User.query.get(user_id)
+        user = User.query.get(user_id)
         if not user:
-            user = models.User(id=user_id, email=email, name=name, picture=picture)
+            user = User(id=user_id, email=email, name=name, picture=picture)
             db.session.add(user)
         else:
             user.email = email
@@ -58,7 +58,7 @@ def create_or_update_user():
 @app.route('/api/state/<user_id>', methods=['GET'])
 def get_state(user_id):
     try:
-        state = models.UserState.query.filter_by(user_id=user_id).first()
+        state = UserState.query.filter_by(user_id=user_id).first()
         if not state:
             return jsonify({"state": {}}), 200
         return jsonify({"state": state.state_data}), 200
@@ -71,9 +71,9 @@ def save_state(user_id):
         data = request.json
         state_data = data.get('state', {})
         
-        state = models.UserState.query.filter_by(user_id=user_id).first()
+        state = UserState.query.filter_by(user_id=user_id).first()
         if not state:
-            state = models.UserState(user_id=user_id, state_data=state_data)
+            state = UserState(user_id=user_id, state_data=state_data)
             db.session.add(state)
         else:
             state.state_data = state_data
@@ -87,7 +87,7 @@ def save_state(user_id):
 @app.route('/api/tokens/<user_id>/<token_type>', methods=['GET'])
 def get_token(user_id, token_type):
     try:
-        token = models.UserToken.query.filter_by(user_id=user_id, token_type=token_type).first()
+        token = UserToken.query.filter_by(user_id=user_id, token_type=token_type).first()
         if not token:
             return jsonify({"token": None}), 200
         return jsonify({"token": token.get_token()}), 200
@@ -103,9 +103,9 @@ def save_token(user_id, token_type):
         if not token_value:
             return jsonify({"error": "token is required"}), 400
         
-        token = models.UserToken.query.filter_by(user_id=user_id, token_type=token_type).first()
+        token = UserToken.query.filter_by(user_id=user_id, token_type=token_type).first()
         if not token:
-            token = models.UserToken(user_id=user_id, token_type=token_type)
+            token = UserToken(user_id=user_id, token_type=token_type)
             db.session.add(token)
         
         token.set_token(token_value)
@@ -118,7 +118,7 @@ def save_token(user_id, token_type):
 @app.route('/api/tokens/<user_id>/<token_type>', methods=['DELETE'])
 def delete_token(user_id, token_type):
     try:
-        token = models.UserToken.query.filter_by(user_id=user_id, token_type=token_type).first()
+        token = UserToken.query.filter_by(user_id=user_id, token_type=token_type).first()
         if token:
             db.session.delete(token)
             db.session.commit()
