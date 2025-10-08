@@ -20,6 +20,15 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Updates
+
+**Google Authentication (Added October 2025)**
+- Users can now sign in with their Google account
+- One-click authentication using Chrome's built-in OAuth
+- Displays user profile (avatar, name) in toolbar
+- Persistent authentication across browser sessions
+- Automatic token validation and cleanup on page load
+
 ## System Architecture
 
 ### Frontend Architecture
