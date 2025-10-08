@@ -13,7 +13,7 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 - Reminder: Set timed reminders with banner alerts at the top of the page
 - SSENSE: Browse curated fashion products in a 3x5 grid with images, prices, and clickable links
 - Weather: Current weather for your location with temperature, conditions, and forecast
-- Top Sites: Ranked list of top 20 most visited websites from past 7 days with logos and visit counts
+- Top Sites: Ranked list of top 20 most visited websites from past 7 days with logos and visit counts. Users can star/pin favorite sites to keep them at the top while preserving original rank numbers for unstarred sites
 
 ## User Preferences
 
