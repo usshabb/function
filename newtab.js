@@ -1,23 +1,20 @@
-import { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, getDocs, onSnapshot, deleteDoc, query, where, updateDoc } from './firebase-init.js';
-
 let cards = [];
 let draggedCard = null;
 let offset = { x: 0, y: 0 };
 let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
-let currentUser = null;
-let unsubscribeListeners = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    initAuth();
+    loadCards();
+    loadTasks();
+    loadReminders();
+    startReminderChecker();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
     document.getElementById('addApp').addEventListener('click', openAppModal);
     document.getElementById('closeModal').addEventListener('click', closeAppModal);
-    document.getElementById('loginBtn').addEventListener('click', handleLogin);
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     
     document.querySelectorAll('.app-option').forEach(option => {
         option.addEventListener('click', (e) => {
@@ -32,65 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
-
-function initAuth() {
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            currentUser = user;
-            updateAuthUI(user);
-            await migrateLocalDataToFirestore();
-            await loadUserData();
-            setupRealtimeListeners();
-            startReminderChecker();
-        } else {
-            currentUser = null;
-            updateAuthUI(null);
-            loadCards();
-            loadTasks();
-            loadReminders();
-            startReminderChecker();
-        }
-    });
-}
-
-function updateAuthUI(user) {
-    const loginBtn = document.getElementById('loginBtn');
-    const userInfo = document.getElementById('userInfo');
-    const userEmail = document.getElementById('userEmail');
-    
-    if (user) {
-        loginBtn.style.display = 'none';
-        userInfo.style.display = 'flex';
-        userEmail.textContent = user.email;
-    } else {
-        loginBtn.style.display = 'block';
-        userInfo.style.display = 'none';
-    }
-}
-
-async function handleLogin() {
-    try {
-        await signInWithPopup(auth, provider);
-    } catch (error) {
-        console.error('Login error:', error);
-        alert('Failed to login. Please try again.');
-    }
-}
-
-async function handleLogout() {
-    try {
-        unsubscribeListeners.forEach(unsub => unsub());
-        unsubscribeListeners = [];
-        cards = [];
-        tasks = [];
-        reminders = [];
-        document.getElementById('canvas').innerHTML = '';
-        await signOut(auth);
-    } catch (error) {
-        console.error('Logout error:', error);
-        alert('Failed to logout. Please try again.');
-    }
-}
 
 function updateCanvasHeight() {
     const canvas = document.getElementById('canvas');
@@ -343,45 +281,18 @@ function updateCardContent(cardId, content) {
     }
 }
 
-async function deleteCard(cardId) {
+function deleteCard(cardId) {
     cards = cards.filter(c => c.id !== cardId);
     const cardEl = document.querySelector(`[data-id="${cardId}"]`);
     if (cardEl) {
         cardEl.remove();
     }
-    
-    if (currentUser) {
-        try {
-            await deleteDoc(doc(db, 'users', currentUser.uid, 'cards', cardId));
-        } catch (error) {
-            console.error('Error deleting card from Firestore:', error);
-        }
-    }
-    
-    await saveCards();
+    saveCards();
     updateCanvasHeight();
 }
 
-async function saveCards() {
-    if (currentUser) {
-        await saveCardsToFirestore();
-    } else {
-        chrome.storage.local.set({ cards: cards });
-    }
-}
-
-async function saveCardsToFirestore() {
-    if (!currentUser) return;
-    
-    try {
-        const userCardsRef = collection(db, 'users', currentUser.uid, 'cards');
-        
-        for (const card of cards) {
-            await setDoc(doc(userCardsRef, card.id), card);
-        }
-    } catch (error) {
-        console.error('Error saving cards to Firestore:', error);
-    }
+function saveCards() {
+    chrome.storage.local.set({ cards: cards });
 }
 
 function loadCards() {
@@ -411,131 +322,6 @@ function loadCards() {
             updateCanvasHeight();
         }
     });
-}
-
-async function loadUserData() {
-    if (!currentUser) return;
-    
-    try {
-        const userCardsRef = collection(db, 'users', currentUser.uid, 'cards');
-        const cardsSnapshot = await getDocs(userCardsRef);
-        cards = [];
-        cardsSnapshot.forEach((doc) => {
-            cards.push(doc.data());
-        });
-        cards.forEach(card => renderCard(card));
-        updateCanvasHeight();
-        
-        const userTasksRef = collection(db, 'users', currentUser.uid, 'tasks');
-        const tasksSnapshot = await getDocs(userTasksRef);
-        tasks = [];
-        tasksSnapshot.forEach((doc) => {
-            tasks.push(doc.data());
-        });
-        
-        const userRemindersRef = collection(db, 'users', currentUser.uid, 'reminders');
-        const remindersSnapshot = await getDocs(userRemindersRef);
-        reminders = [];
-        remindersSnapshot.forEach((doc) => {
-            reminders.push(doc.data());
-        });
-        
-        const userCredsDoc = await getDoc(doc(db, 'users', currentUser.uid, 'credentials', 'tokens'));
-        if (userCredsDoc.exists()) {
-            const creds = userCredsDoc.data();
-            if (creds.mercuryToken) {
-                chrome.storage.local.set({ mercuryToken: creds.mercuryToken, mercuryConnected: true });
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error loading user data:', error);
-    }
-}
-
-async function migrateLocalDataToFirestore() {
-    if (!currentUser) return;
-    
-    const migrationKey = `migrated_${currentUser.uid}`;
-    const migrated = localStorage.getItem(migrationKey);
-    
-    if (migrated) return;
-    
-    try {
-        chrome.storage.local.get(['cards', 'tasks', 'reminders', 'mercuryToken', 'mercuryConnected'], async (result) => {
-            if (result.cards && result.cards.length > 0) {
-                const userCardsRef = collection(db, 'users', currentUser.uid, 'cards');
-                for (const card of result.cards) {
-                    await setDoc(doc(userCardsRef, card.id), card);
-                }
-            }
-            
-            if (result.tasks && result.tasks.length > 0) {
-                const userTasksRef = collection(db, 'users', currentUser.uid, 'tasks');
-                for (const task of result.tasks) {
-                    await setDoc(doc(userTasksRef, task.id), task);
-                }
-            }
-            
-            if (result.reminders && result.reminders.length > 0) {
-                const userRemindersRef = collection(db, 'users', currentUser.uid, 'reminders');
-                for (const reminder of result.reminders) {
-                    await setDoc(doc(userRemindersRef, reminder.id), reminder);
-                }
-            }
-            
-            if (result.mercuryToken) {
-                await setDoc(doc(db, 'users', currentUser.uid, 'credentials', 'tokens'), {
-                    mercuryToken: result.mercuryToken,
-                    mercuryConnected: result.mercuryConnected || false
-                });
-            }
-            
-            localStorage.setItem(migrationKey, 'true');
-        });
-    } catch (error) {
-        console.error('Error migrating data:', error);
-    }
-}
-
-function setupRealtimeListeners() {
-    if (!currentUser) return;
-    
-    const userCardsRef = collection(db, 'users', currentUser.uid, 'cards');
-    const cardsUnsubscribe = onSnapshot(userCardsRef, (snapshot) => {
-        cards = [];
-        snapshot.forEach((doc) => {
-            cards.push(doc.data());
-        });
-        document.getElementById('canvas').innerHTML = '';
-        cards.forEach(card => renderCard(card));
-        updateCanvasHeight();
-    });
-    unsubscribeListeners.push(cardsUnsubscribe);
-    
-    const userTasksRef = collection(db, 'users', currentUser.uid, 'tasks');
-    const tasksUnsubscribe = onSnapshot(userTasksRef, (snapshot) => {
-        tasks = [];
-        snapshot.forEach((doc) => {
-            tasks.push(doc.data());
-        });
-        document.querySelectorAll('[id^="tasks-list-"]').forEach(list => {
-            renderTasksList(list);
-        });
-    });
-    unsubscribeListeners.push(tasksUnsubscribe);
-    
-    const userRemindersRef = collection(db, 'users', currentUser.uid, 'reminders');
-    const remindersUnsubscribe = onSnapshot(userRemindersRef, (snapshot) => {
-        reminders = [];
-        snapshot.forEach((doc) => {
-            reminders.push(doc.data());
-        });
-        document.querySelectorAll('[id^="reminders-list-"]').forEach(list => {
-            renderRemindersList(list);
-        });
-    });
-    unsubscribeListeners.push(remindersUnsubscribe);
 }
 
 function openAppModal() {
@@ -573,26 +359,16 @@ function handleAppSelection(appType) {
     }
 }
 
-async function promptMercuryToken() {
+function promptMercuryToken() {
     closeAppModal();
     
-    chrome.storage.local.get(['mercuryConnected'], async (result) => {
+    chrome.storage.local.get(['mercuryConnected'], (result) => {
         if (result.mercuryConnected) {
             createMercuryCard();
         } else {
             const token = prompt('Enter your Mercury API token:');
             if (token && token.trim()) {
-                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, async () => {
-                    if (currentUser) {
-                        try {
-                            await setDoc(doc(db, 'users', currentUser.uid, 'credentials', 'tokens'), {
-                                mercuryToken: token.trim(),
-                                mercuryConnected: true
-                            });
-                        } catch (error) {
-                            console.error('Error saving Mercury token to Firestore:', error);
-                        }
-                    }
+                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, () => {
                     createMercuryCard();
                 });
             }
@@ -1115,19 +891,9 @@ function renderTasksList(container) {
         deleteBtn.textContent = '×';
         deleteBtn.onmouseover = () => deleteBtn.style.color = '#d93025';
         deleteBtn.onmouseout = () => deleteBtn.style.color = '#9b9a97';
-        deleteBtn.addEventListener('click', async () => {
-            const taskId = task.id;
-            tasks = tasks.filter(t => t.id !== taskId);
-            
-            if (currentUser) {
-                try {
-                    await deleteDoc(doc(db, 'users', currentUser.uid, 'tasks', taskId));
-                } catch (error) {
-                    console.error('Error deleting task from Firestore:', error);
-                }
-            }
-            
-            await saveTasks();
+        deleteBtn.addEventListener('click', () => {
+            tasks = tasks.filter(t => t.id !== task.id);
+            saveTasks();
             renderTasksList(container);
         });
         
@@ -1145,26 +911,8 @@ function loadTasks() {
     });
 }
 
-async function saveTasks() {
-    if (currentUser) {
-        await saveTasksToFirestore();
-    } else {
-        chrome.storage.local.set({ tasks: tasks });
-    }
-}
-
-async function saveTasksToFirestore() {
-    if (!currentUser) return;
-    
-    try {
-        const userTasksRef = collection(db, 'users', currentUser.uid, 'tasks');
-        
-        for (const task of tasks) {
-            await setDoc(doc(userTasksRef, task.id), task);
-        }
-    } catch (error) {
-        console.error('Error saving tasks to Firestore:', error);
-    }
+function saveTasks() {
+    chrome.storage.local.set({ tasks: tasks });
 }
 
 function formatDate(dateString) {
@@ -1302,19 +1050,9 @@ function renderRemindersList(container) {
         const deleteBtn = document.createElement('button');
         deleteBtn.style.cssText = 'background: transparent; border: none; color: #9b9a97; cursor: pointer; font-size: 18px; padding: 0 4px; flex-shrink: 0;';
         deleteBtn.textContent = '×';
-        deleteBtn.addEventListener('click', async () => {
-            const reminderId = reminder.id;
-            reminders = reminders.filter(r => r.id !== reminderId);
-            
-            if (currentUser) {
-                try {
-                    await deleteDoc(doc(db, 'users', currentUser.uid, 'reminders', reminderId));
-                } catch (error) {
-                    console.error('Error deleting reminder from Firestore:', error);
-                }
-            }
-            
-            await saveReminders();
+        deleteBtn.addEventListener('click', () => {
+            reminders = reminders.filter(r => r.id !== reminder.id);
+            saveReminders();
             renderRemindersList(container);
         });
         
@@ -1331,26 +1069,8 @@ function loadReminders() {
     });
 }
 
-async function saveReminders() {
-    if (currentUser) {
-        await saveRemindersToFirestore();
-    } else {
-        chrome.storage.local.set({ reminders: reminders });
-    }
-}
-
-async function saveRemindersToFirestore() {
-    if (!currentUser) return;
-    
-    try {
-        const userRemindersRef = collection(db, 'users', currentUser.uid, 'reminders');
-        
-        for (const reminder of reminders) {
-            await setDoc(doc(userRemindersRef, reminder.id), reminder);
-        }
-    } catch (error) {
-        console.error('Error saving reminders to Firestore:', error);
-    }
+function saveReminders() {
+    chrome.storage.local.set({ reminders: reminders });
 }
 
 function startReminderChecker() {
