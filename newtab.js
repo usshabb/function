@@ -150,6 +150,10 @@ function renderCard(card) {
         cardEl.style.minWidth = '300px';
         cardEl.style.maxWidth = '300px';
         cardEl.style.cursor = 'default';
+    } else if (card.type === 'history') {
+        cardEl.style.minWidth = '350px';
+        cardEl.style.maxWidth = '350px';
+        cardEl.style.cursor = 'default';
     }
     
     cardEl.appendChild(content);
@@ -174,6 +178,8 @@ function renderCard(card) {
         renderSSENSECard(cardEl, card.id);
     } else if (card.type === 'weather') {
         renderWeatherCard(cardEl, card.id);
+    } else if (card.type === 'history') {
+        renderHistoryCard(cardEl, card.id);
     }
     
     updateCanvasHeight();
@@ -356,6 +362,9 @@ function handleAppSelection(appType) {
     } else if (appType === 'weather') {
         closeAppModal();
         createWeatherCard();
+    } else if (appType === 'history') {
+        closeAppModal();
+        createHistoryCard();
     }
 }
 
@@ -1332,4 +1341,128 @@ async function renderWeatherCard(cardEl, cardId) {
             content.innerHTML = '<div style="text-align: center; padding: 20px; color: #d93025;">Location permission denied</div>';
         }
     );
+}
+
+function createHistoryCard() {
+    const card = {
+        id: Date.now().toString(),
+        type: 'history',
+        x: window.innerWidth / 2 - 175,
+        y: window.innerHeight / 2 - 150,
+        content: ''
+    };
+    
+    cards.push(card);
+    renderCard(card);
+    saveCards();
+    updateCanvasHeight();
+}
+
+function extractRootDomain(url) {
+    try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname;
+        const parts = hostname.split('.');
+        
+        if (parts.length >= 2) {
+            return parts.slice(-2).join('.');
+        }
+        return hostname;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchBrowsingHistory() {
+    try {
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        
+        const historyItems = await chrome.history.search({
+            text: '',
+            startTime: sevenDaysAgo,
+            maxResults: 10000
+        });
+        
+        const domainCounts = {};
+        
+        historyItems.forEach(item => {
+            if (item.url) {
+                const domain = extractRootDomain(item.url);
+                if (domain && !domain.includes('chrome://') && !domain.includes('chrome-extension://')) {
+                    domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+                }
+            }
+        });
+        
+        const sortedDomains = Object.entries(domainCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20)
+            .map(([domain, count]) => ({ domain, count }));
+        
+        return sortedDomains;
+    } catch (error) {
+        console.error('Error fetching history:', error);
+        return [];
+    }
+}
+
+async function renderHistoryCard(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    
+    content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Loading history...</div>';
+    
+    const topSites = await fetchBrowsingHistory();
+    
+    if (topSites.length === 0) {
+        content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">No history found</div>';
+        return;
+    }
+    
+    content.innerHTML = '';
+    
+    const list = document.createElement('div');
+    list.className = 'history-list';
+    
+    topSites.forEach((site, index) => {
+        const siteItem = document.createElement('div');
+        siteItem.className = 'history-item';
+        
+        const favicon = document.createElement('img');
+        favicon.className = 'history-favicon';
+        favicon.src = `https://www.google.com/s2/favicons?domain=${site.domain}&sz=32`;
+        favicon.alt = site.domain;
+        favicon.onerror = () => {
+            favicon.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23999"><circle cx="12" cy="12" r="10"/></svg>';
+        };
+        
+        const siteInfo = document.createElement('div');
+        siteInfo.className = 'history-info';
+        
+        const siteName = document.createElement('div');
+        siteName.className = 'history-domain';
+        siteName.textContent = site.domain;
+        
+        const siteCount = document.createElement('div');
+        siteCount.className = 'history-count';
+        siteCount.textContent = `${site.count} visits`;
+        
+        siteInfo.appendChild(siteName);
+        siteInfo.appendChild(siteCount);
+        
+        const rank = document.createElement('div');
+        rank.className = 'history-rank';
+        rank.textContent = `#${index + 1}`;
+        
+        siteItem.appendChild(rank);
+        siteItem.appendChild(favicon);
+        siteItem.appendChild(siteInfo);
+        
+        siteItem.addEventListener('click', () => {
+            window.open(`https://${site.domain}`, '_blank');
+        });
+        
+        list.appendChild(siteItem);
+    });
+    
+    content.appendChild(list);
 }
