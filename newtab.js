@@ -1385,14 +1385,20 @@ async function fetchBrowsingHistory() {
         
         const domainCounts = {};
         
-        historyItems.forEach(item => {
+        for (const item of historyItems) {
             if (item.url) {
                 const domain = extractRootDomain(item.url);
                 if (domain && !domain.includes('chrome://') && !domain.includes('chrome-extension://')) {
-                    domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+                    const visits = await chrome.history.getVisits({ url: item.url });
+                    
+                    const recentVisits = visits.filter(visit => visit.visitTime >= sevenDaysAgo);
+                    
+                    if (recentVisits.length > 0) {
+                        domainCounts[domain] = (domainCounts[domain] || 0) + recentVisits.length;
+                    }
                 }
             }
-        });
+        }
         
         const sortedDomains = Object.entries(domainCounts)
             .sort((a, b) => b[1] - a[1])
