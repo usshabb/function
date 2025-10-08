@@ -1454,8 +1454,13 @@ async function renderHistoryCard(cardEl, cardId) {
     
     const starredSites = await loadStarredSites();
     
-    const starredList = topSites.filter(site => starredSites.includes(site.domain));
-    const unstarredList = topSites.filter(site => !starredSites.includes(site.domain));
+    const sitesWithRank = topSites.map((site, index) => ({
+        ...site,
+        originalRank: index + 1
+    }));
+    
+    const starredList = sitesWithRank.filter(site => starredSites.includes(site.domain));
+    const unstarredList = sitesWithRank.filter(site => !starredSites.includes(site.domain));
     const sortedSites = [...starredList, ...unstarredList];
     
     content.innerHTML = '';
@@ -1464,7 +1469,7 @@ async function renderHistoryCard(cardEl, cardId) {
     list.className = 'history-list';
     list.id = `history-list-${cardId}`;
     
-    sortedSites.forEach((site, index) => {
+    sortedSites.forEach((site) => {
         const isStarred = starredSites.includes(site.domain);
         const siteItem = document.createElement('div');
         siteItem.className = 'history-item' + (isStarred ? ' starred' : '');
@@ -1474,8 +1479,7 @@ async function renderHistoryCard(cardEl, cardId) {
         if (isStarred) {
             rank.innerHTML = '📌';
         } else {
-            const actualRank = index - starredList.length + 1;
-            rank.textContent = `#${actualRank}`;
+            rank.textContent = `#${site.originalRank}`;
         }
         
         const favicon = document.createElement('img');
