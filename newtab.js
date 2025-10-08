@@ -1826,11 +1826,27 @@ function showFeedManager(cardEl, cardId) {
 }
 
 async function checkAuthStatus() {
-    chrome.storage.local.get(['userInfo'], (result) => {
-        if (result.userInfo) {
-            updateAuthUI(result.userInfo);
+    chrome.identity.getAuthToken({ interactive: false }, async (token) => {
+        if (chrome.runtime.lastError || !token) {
+            chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                document.getElementById('signInBtn').style.display = 'block';
+                document.getElementById('userProfile').style.display = 'none';
+            });
+            return;
+        }
+        
+        const userInfo = await getUserInfo(token);
+        if (userInfo) {
+            chrome.storage.local.set({ userInfo: userInfo, authToken: token }, () => {
+                updateAuthUI(userInfo);
+            });
         } else {
-            document.getElementById('signInBtn').style.display = 'block';
+            chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                    document.getElementById('signInBtn').style.display = 'block';
+                    document.getElementById('userProfile').style.display = 'none';
+                });
+            });
         }
     });
 }
@@ -1877,6 +1893,13 @@ async function getUserInfo(token) {
         if (response.ok) {
             return await response.json();
         }
+        
+        if (response.status === 401) {
+            chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                console.log('Removed invalid cached token');
+            });
+        }
+        
         return null;
     } catch (error) {
         console.error('Error fetching user info:', error);
