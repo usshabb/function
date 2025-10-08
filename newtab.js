@@ -10,11 +10,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
     loadReminders();
     startReminderChecker();
+    checkAuthStatus();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
     document.getElementById('addApp').addEventListener('click', openAppModal);
     document.getElementById('closeModal').addEventListener('click', closeAppModal);
+    document.getElementById('signInBtn').addEventListener('click', signInWithGoogle);
+    document.getElementById('signOutBtn').addEventListener('click', signOutFromGoogle);
     
     document.querySelectorAll('.app-option').forEach(option => {
         option.addEventListener('click', (e) => {
@@ -1820,4 +1823,75 @@ function showFeedManager(cardEl, cardId) {
         
         content.appendChild(addSection);
     });
+}
+
+async function checkAuthStatus() {
+    chrome.storage.local.get(['userInfo'], (result) => {
+        if (result.userInfo) {
+            updateAuthUI(result.userInfo);
+        } else {
+            document.getElementById('signInBtn').style.display = 'block';
+        }
+    });
+}
+
+async function signInWithGoogle() {
+    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+        if (chrome.runtime.lastError) {
+            console.error('Auth error:', chrome.runtime.lastError);
+            return;
+        }
+        
+        if (token) {
+            const userInfo = await getUserInfo(token);
+            if (userInfo) {
+                chrome.storage.local.set({ userInfo: userInfo, authToken: token }, () => {
+                    updateAuthUI(userInfo);
+                });
+            }
+        }
+    });
+}
+
+async function signOutFromGoogle() {
+    chrome.storage.local.get(['authToken'], (result) => {
+        if (result.authToken) {
+            chrome.identity.removeCachedAuthToken({ token: result.authToken }, () => {
+                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                    document.getElementById('userProfile').style.display = 'none';
+                    document.getElementById('signInBtn').style.display = 'block';
+                });
+            });
+        }
+    });
+}
+
+async function getUserInfo(token) {
+    try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            return await response.json();
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching user info:', error);
+        return null;
+    }
+}
+
+function updateAuthUI(userInfo) {
+    document.getElementById('signInBtn').style.display = 'none';
+    document.getElementById('userProfile').style.display = 'flex';
+    document.getElementById('userName').textContent = userInfo.name || userInfo.email;
+    
+    if (userInfo.picture) {
+        document.getElementById('userAvatar').src = userInfo.picture;
+    } else {
+        document.getElementById('userAvatar').style.display = 'none';
+    }
 }

@@ -10,9 +10,21 @@
     <div id="reminderBanners" class="reminder-banners"></div>
     
     <div class="toolbar">
-        <button id="addNote" class="tool-btn">+ Note</button>
-        <button id="addLink" class="tool-btn">+ Link</button>
-        <button id="addApp" class="tool-btn">+ Apps</button>
+        <div class="toolbar-left">
+            <button id="addNote" class="tool-btn">+ Note</button>
+            <button id="addLink" class="tool-btn">+ Link</button>
+            <button id="addApp" class="tool-btn">+ Apps</button>
+        </div>
+        <div class="toolbar-right">
+            <div id="authContainer" class="auth-container">
+                <button id="signInBtn" class="auth-btn" style="display: none;">Sign in with Google</button>
+                <div id="userProfile" class="user-profile" style="display: none;">
+                    <img id="userAvatar" class="user-avatar" src="" alt="">
+                    <span id="userName" class="user-name"></span>
+                    <button id="signOutBtn" class="auth-btn-secondary">Sign out</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     
