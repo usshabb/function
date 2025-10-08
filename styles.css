@@ -77,7 +77,19 @@ body {
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     z-index: 1000;
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 600px;
+}
+
+.toolbar-left {
+    display: flex;
     gap: 8px;
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
 }
 
 .tool-btn {
@@ -92,6 +104,61 @@ body {
 }
 
 .tool-btn:hover {
+    background: #f1f1ef;
+}
+
+.auth-container {
+    display: flex;
+    align-items: center;
+}
+
+.auth-btn {
+    background: #2383e2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.auth-btn:hover {
+    background: #1a6ec7;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-name {
+    font-size: 14px;
+    color: #37352f;
+    font-weight: 500;
+}
+
+.auth-btn-secondary {
+    background: transparent;
+    border: 1px solid #e1e1e1;
+    color: #37352f;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+
+.auth-btn-secondary:hover {
     background: #f1f1ef;
 }
 
