@@ -44,6 +44,10 @@ waitForPort = 3000
 outputType = "console"
 
 [[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 
@@ -52,8 +56,8 @@ localPort = 44045
 externalPort = 3000
 
 [[ports]]
-localPort = 3000
-externalPort = 3000
+localPort = 45807
+externalPort = 3001
 
 [nix]
 channel = "stable-25_05"

@@ -1,3 +1,14 @@
+import os
+import base64
+import hashlib
+from datetime import datetime
+from cryptography.fernet import Fernet
+
+session_secret = os.environ.get("SESSION_SECRET", "default-secret-key-for-development")
+encryption_key = base64.urlsafe_b64encode(hashlib.sha256(session_secret.encode()).digest())
+cipher = Fernet(encryption_key)
+
+from main import db
 
 class User(db.Model):
     __tablename__ = 'users'

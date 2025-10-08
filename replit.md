@@ -22,6 +22,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates
 
+**Cloud Sync with PostgreSQL Backend (Added October 2025)**
+- Complete state synchronization across browsers and devices
+- PostgreSQL database backend hosted on Replit
+- Auto-save with 2-3 second debounce for optimal performance
+- Encrypted storage for sensitive API tokens (Mercury, etc.)
+- Visual sync status indicator in toolbar (saving/saved/error states)
+- Offline-first architecture with automatic sync when reconnected
+
 **Google Authentication (Added October 2025)**
 - Users can now sign in with their Google account
 - One-click authentication using Chrome's built-in OAuth
@@ -54,12 +62,19 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 
-**Chrome Storage API**
-- Uses `chrome.storage` API for persistent data storage
-- Cards are stored as JSON array with properties: id, type, x/y coordinates, and content
-- Chosen over localStorage for better Chrome extension integration and sync capabilities
-- Pros: Native extension API, potential for sync across devices
-- Cons: Requires explicit permission in manifest
+**Hybrid Storage Architecture**
+- Local: Chrome Storage API (`chrome.storage.local`) for offline-first capability
+- Cloud: PostgreSQL database on Replit for cross-device sync
+- Auto-sync triggered on all state changes with debounced saves (2-3s delay)
+- Encrypted token storage using Fernet (AES-128) for sensitive API keys
+- User identified by Google ID for cloud state lookup
+
+**Chrome Storage API (Local)**
+- Uses `chrome.storage.local` for immediate offline access
+- Cards stored as JSON array with properties: id, type, x/y coordinates, and content
+- Chosen over localStorage for better Chrome extension integration
+- Pros: Native extension API, instant access, offline capability
+- Cons: Chrome-only, requires explicit permission in manifest
 
 **Data Model**
 ```
@@ -82,12 +97,16 @@ Card {
 - Cons: MV3 is more restrictive than MV2, but not a concern for this use case
 
 **File Organization**
-- `manifest.json`: Extension configuration and permissions
-- `newtab.html`: Main application entry point
-- `newtab.js`: Core application logic and state management
-- `styles.css`: All visual styling
+- `extension/` folder: Contains ONLY extension files for Chrome installation
+  - `manifest.json`: Extension configuration and permissions
+  - `newtab.html`: Main application entry point
+  - `newtab.js`: Core application logic and state management
+  - `styles.css`: All visual styling
+  - `README.txt`: Installation instructions
+  - Icon files: Extension branding at multiple resolutions
+- `main.py`: Flask backend API for cloud sync
+- `models.py`: Database models (User, UserState, UserToken)
 - `index.html`: Installation guide/landing page (separate from extension)
-- Icon files: Extension branding at multiple resolutions
 
 ### State Management
 
@@ -129,16 +148,50 @@ Card {
 - Clean card-based layout with hover effects
 - "Manage Feeds" button toggles between article view and feed management interface
 
+## Backend Architecture
+
+**Python Flask API (Cloud Sync)**
+- REST API endpoints for state management
+- PostgreSQL database with SQLAlchemy ORM
+- Encryption using Fernet (cryptography library) for token storage
+- CORS enabled for cross-origin extension requests
+
+**API Endpoints**
+- `POST /api/user`: Create or update user profile
+- `GET /api/state/<user_id>`: Retrieve user's complete state
+- `POST /api/state/<user_id>`: Save user's complete state
+- `GET /api/tokens/<user_id>/<token_type>`: Retrieve encrypted token
+- `POST /api/tokens/<user_id>/<token_type>`: Save encrypted token
+- `DELETE /api/tokens/<user_id>/<token_type>`: Delete token
+
+**Database Tables**
+- `users`: User profiles (id, email, name, picture)
+- `user_state`: Complete canvas state (cards, tasks, reminders, RSS feeds)
+- `user_tokens`: Encrypted API tokens (Mercury, etc.)
+
+**Security**
+- API keys encrypted with Fernet (32-byte key derived from SESSION_SECRET)
+- User authentication via Google OAuth token validation
+- HTTPS-only communication between extension and backend
+
 ## External Dependencies
 
 **Chrome Extension APIs**
 - `chrome.storage`: For persisting card data across sessions
+- `chrome.identity`: For Google OAuth authentication
 - `chrome_url_overrides`: To replace the new tab page
 
-**No Third-Party Libraries**
-- Project intentionally avoids external dependencies
-- All functionality implemented with vanilla JavaScript
+**Frontend Dependencies**
+- No third-party libraries - pure vanilla JavaScript
+- All functionality implemented with native browser APIs
 - Rationale: Minimize load time, reduce security surface area, simplify distribution
+
+**Backend Dependencies (Python)**
+- Flask: Web framework for API endpoints
+- Flask-CORS: Cross-origin request handling
+- Flask-SQLAlchemy: Database ORM
+- cryptography: Token encryption (Fernet)
+- psycopg2-binary: PostgreSQL adapter
 
 **Browser Compatibility**
 - Designed specifically for Chromium-based browsers (Chrome, Edge, Brave, etc.)

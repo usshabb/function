@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Tab</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="reminderBanners" class="reminder-banners"></div>
+    
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <button id="addNote" class="tool-btn">+ Note</button>
+            <button id="addLink" class="tool-btn">+ Link</button>
+            <button id="addApp" class="tool-btn">+ Apps</button>
+        </div>
+        <div class="toolbar-right">
+            <div id="authContainer" class="auth-container">
+                <button id="signInBtn" class="auth-btn" style="display: none;">Sign in with Google</button>
+                <div id="userProfile" class="user-profile" style="display: none;">
+                    <img id="userAvatar" class="user-avatar" src="" alt="">
+                    <span id="userName" class="user-name"></span>
+                    <button id="signOutBtn" class="auth-btn-secondary">Sign out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    
+    <div id="appModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Connect an App</h2>
+                <button id="closeModal" class="close-btn">×</button>
+            </div>
+            <div class="app-list">
+                <div class="app-option" data-app="mercury">
+                    <div class="app-info">
+                        <div class="app-name">Mercury.com</div>
+                        <div class="app-description">Connect your Mercury bank account</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="chatgpt">
+                    <div class="app-info">
+                        <div class="app-name">ChatGPT</div>
+                        <div class="app-description">Quick access to ask ChatGPT</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="google">
+                    <div class="app-info">
+                        <div class="app-name">Search Google</div>
+                        <div class="app-description">Quick Google search widget</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="gmail">
+                    <div class="app-info">
+                        <div class="app-name">Gmail</div>
+                        <div class="app-description">View your last 20 emails</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="tasks">
+                    <div class="app-info">
+                        <div class="app-name">Tasks</div>
+                        <div class="app-description">Manage your to-do list</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="reminder">
+                    <div class="app-info">
+                        <div class="app-name">Reminder</div>
+                        <div class="app-description">Set reminders with alerts</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="ssense">
+                    <div class="app-info">
+                        <div class="app-name">SSENSE</div>
+                        <div class="app-description">Browse curated fashion products</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="weather">
+                    <div class="app-info">
+                        <div class="app-name">Weather</div>
+                        <div class="app-description">Current weather for your location</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="history">
+                    <div class="app-info">
+                        <div class="app-name">Top Sites</div>
+                        <div class="app-description">Your most visited sites from past 7 days</div>
+                    </div>
+                </div>
+                <div class="app-option" data-app="rss">
+                    <div class="app-info">
+                        <div class="app-name">RSS Reader</div>
+                        <div class="app-description">Follow tech blogs and see latest articles</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="canvas" class="canvas"></div>
+
+    <script src="newtab.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Canvas Tab",
+  "version": "1.0",
+  "description": "A Notion-like canvas for your new tab page",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": [
+    "storage",
+    "identity",
+    "geolocation",
+    "history"
+  ],
+  "host_permissions": [
+    "https://api.mercury.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "675184384185-nokqu1b9u0i36jnbvufflmlp50tsec1t.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
