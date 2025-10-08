@@ -782,3 +782,150 @@ body {
 .history-item.starred:hover {
     background: #fde68a;
 }
+
+.rss-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e1e1e1;
+    margin-bottom: 12px;
+}
+
+.rss-manage-btn {
+    background: #f7f6f3;
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.rss-manage-btn:hover {
+    background: #e9e9e7;
+}
+
+.rss-article-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.rss-article {
+    display: block;
+    padding: 12px;
+    border-radius: 6px;
+    background: #f7f6f3;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s;
+}
+
+.rss-article:hover {
+    background: #e9e9e7;
+}
+
+.rss-article-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #37352f;
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.rss-article-meta {
+    font-size: 12px;
+    color: #9b9a97;
+}
+
+.rss-feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.rss-feed-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: #f7f6f3;
+    border-radius: 6px;
+}
+
+.rss-feed-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.rss-feed-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #37352f;
+    margin-bottom: 4px;
+}
+
+.rss-feed-url {
+    font-size: 12px;
+    color: #9b9a97;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rss-remove-btn {
+    background: transparent;
+    border: none;
+    color: #eb5757;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: 8px;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.rss-remove-btn:hover {
+    transform: scale(1.2);
+}
+
+.rss-add-section {
+    padding: 16px;
+    background: #f7f6f3;
+    border-radius: 6px;
+    margin-top: 12px;
+}
+
+.rss-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+
+.rss-input:focus {
+    outline: none;
+    border-color: #2383e2;
+}
+
+.rss-add-btn {
+    width: 100%;
+    background: #2383e2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.rss-add-btn:hover {
+    background: #1a6ec7;
+}
