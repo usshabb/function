@@ -13,7 +13,8 @@
   ],
   "host_permissions": [
     "https://api.mercury.com/*",
-    "https://www.googleapis.com/*"
+    "https://www.googleapis.com/*",
+    "https://www.gstatic.com/*"
   ],
   "oauth2": {
     "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
@@ -25,5 +26,9 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  }
+  },
+  "web_accessible_resources": [{
+    "resources": ["firebase-sdk/*.js"],
+    "matches": ["<all_urls>"]
+  }]
 }

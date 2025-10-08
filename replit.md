@@ -133,7 +133,8 @@ Reminder {
 **Firebase Services (Added October 2025)**
 - Firebase Authentication: Google OAuth sign-in
 - Firebase Firestore: Cloud database for real-time multi-device sync
-- Firebase SDK v11.0.1 (modular imports)
+- Firebase SDK v10.7.1 (bundled locally for Manifest V3 compatibility)
+- **Important**: Firebase files are downloaded and stored locally in `/firebase-sdk/` because Chrome extensions with Manifest V3 cannot load external scripts from CDNs
 - Configuration stored in Replit Secrets: `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`, `FIREBASE_APP_ID`
 - Rationale: Enable cross-device synchronization and cloud backup
 
