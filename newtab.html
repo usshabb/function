@@ -13,6 +13,13 @@
         <button id="addNote" class="tool-btn">+ Note</button>
         <button id="addLink" class="tool-btn">+ Link</button>
         <button id="addApp" class="tool-btn">+ Apps</button>
+        <div class="auth-section">
+            <button id="loginBtn" class="auth-btn" style="display: none;">Login with Google</button>
+            <div id="userInfo" style="display: none;">
+                <span id="userEmail" class="user-email"></span>
+                <button id="logoutBtn" class="auth-btn">Logout</button>
+            </div>
+        </div>
     </div>
     
     
@@ -77,6 +84,6 @@
     
     <div id="canvas" class="canvas"></div>
 
-    <script src="newtab.js"></script>
+    <script type="module" src="newtab.js"></script>
 </body>
 </html>

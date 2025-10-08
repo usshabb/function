@@ -78,6 +78,37 @@ body {
     z-index: 1000;
     display: flex;
     gap: 8px;
+    align-items: center;
+}
+
+.auth-section {
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid #e3e2e0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auth-btn {
+    background: #2383e2;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.auth-btn:hover {
+    background: #1a6ec9;
+}
+
+.user-email {
+    font-size: 13px;
+    color: #37352f;
+    margin-right: 8px;
 }
 
 .tool-btn {
