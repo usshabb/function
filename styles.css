@@ -147,6 +147,30 @@ body {
     font-weight: 500;
 }
 
+.sync-indicator {
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    margin-left: 12px;
+    transition: opacity 0.3s;
+    font-weight: 500;
+}
+
+.sync-indicator.saving {
+    background: #ffe4b3;
+    color: #8b5a00;
+}
+
+.sync-indicator.saved {
+    background: #d3f8df;
+    color: #0f7b3d;
+}
+
+.sync-indicator.error {
+    background: #ffe0e0;
+    color: #c41e3a;
+}
+
 .auth-btn-secondary {
     background: transparent;
     border: 1px solid #e1e1e1;

@@ -1,10 +1,3 @@
-import os
-from main import db
-from datetime import datetime
-from cryptography.fernet import Fernet
-
-encryption_key = os.environ.get("SESSION_SECRET", Fernet.generate_key().decode()).encode()[:32]
-cipher = Fernet(encryption_key.ljust(44, b'='))
 
 class User(db.Model):
     __tablename__ = 'users'

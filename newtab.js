@@ -5,6 +5,13 @@ let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
 
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : `https://${window.location.hostname.replace(/^.*?\.replit\.dev$/, match => match.replace(/^.*?-/, ''))}/api`.replace('/api', ':3000');
+
+let syncTimeout = null;
+let currentUserId = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     loadCards();
     loadTasks();
@@ -308,6 +315,7 @@ function deleteCard(cardId) {
 
 function saveCards() {
     chrome.storage.local.set({ cards: cards });
+    debouncedSync();
 }
 
 function loadCards() {
@@ -337,6 +345,174 @@ function loadCards() {
             updateCanvasHeight();
         }
     });
+}
+
+function debouncedSync() {
+    if (!currentUserId) return;
+    
+    if (syncTimeout) {
+        clearTimeout(syncTimeout);
+    }
+    
+    syncTimeout = setTimeout(() => {
+        syncStateToBackend();
+    }, 2000);
+}
+
+async function syncStateToBackend() {
+    if (!currentUserId) return;
+    
+    try {
+        showSyncStatus('saving');
+        
+        const state = {
+            cards: cards,
+            tasks: tasks,
+            reminders: reminders,
+            starredSites: await getStarredSites(),
+            rssFeeds: await getAllRssFeeds()
+        };
+        
+        const response = await fetch(`${API_URL}/api/state/${currentUserId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ state })
+        });
+        
+        if (response.ok) {
+            showSyncStatus('saved');
+        } else {
+            showSyncStatus('error');
+        }
+    } catch (error) {
+        console.error('Sync error:', error);
+        showSyncStatus('error');
+    }
+}
+
+async function loadStateFromBackend() {
+    if (!currentUserId) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/state/${currentUserId}`);
+        const data = await response.json();
+        
+        if (data.state && Object.keys(data.state).length > 0) {
+            if (data.state.cards) {
+                cards = data.state.cards;
+                chrome.storage.local.set({ cards: cards });
+                document.getElementById('canvas').innerHTML = '';
+                cards.forEach(card => renderCard(card));
+                updateCanvasHeight();
+            }
+            
+            if (data.state.tasks) {
+                tasks = data.state.tasks;
+                chrome.storage.local.set({ tasks: tasks });
+            }
+            
+            if (data.state.reminders) {
+                reminders = data.state.reminders;
+                chrome.storage.local.set({ reminders: reminders });
+            }
+            
+            if (data.state.starredSites) {
+                chrome.storage.local.set({ starredSites: data.state.starredSites });
+            }
+            
+            if (data.state.rssFeeds) {
+                for (const [cardId, feeds] of Object.entries(data.state.rssFeeds)) {
+                    chrome.storage.local.set({ [`rssFeeds_${cardId}`]: feeds });
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Load state error:', error);
+    }
+}
+
+async function createOrUpdateUser(userInfo) {
+    try {
+        const response = await fetch(`${API_URL}/api/user`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userInfo.id,
+                email: userInfo.email,
+                name: userInfo.name,
+                picture: userInfo.picture
+            })
+        });
+        
+        if (response.ok) {
+            currentUserId = userInfo.id;
+            await migrateLocalDataToBackend();
+            await loadStateFromBackend();
+        }
+    } catch (error) {
+        console.error('User creation error:', error);
+    }
+}
+
+async function migrateLocalDataToBackend() {
+    const hasLocalData = cards.length > 0 || tasks.length > 0 || reminders.length > 0;
+    
+    if (hasLocalData) {
+        await syncStateToBackend();
+    }
+}
+
+async function getStarredSites() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['starredSites'], (result) => {
+            resolve(result.starredSites || []);
+        });
+    });
+}
+
+async function getAllRssFeeds() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(null, (result) => {
+            const rssFeeds = {};
+            for (const key in result) {
+                if (key.startsWith('rssFeeds_')) {
+                    rssFeeds[key.replace('rssFeeds_', '')] = result[key];
+                }
+            }
+            resolve(rssFeeds);
+        });
+    });
+}
+
+function showSyncStatus(status) {
+    let syncIndicator = document.getElementById('syncIndicator');
+    if (!syncIndicator) {
+        syncIndicator = document.createElement('div');
+        syncIndicator.id = 'syncIndicator';
+        document.querySelector('.toolbar').appendChild(syncIndicator);
+    }
+    
+    syncIndicator.className = `sync-indicator ${status}`;
+    
+    if (status === 'saving') {
+        syncIndicator.textContent = '↻ Saving...';
+    } else if (status === 'saved') {
+        syncIndicator.textContent = '✓ Saved';
+        setTimeout(() => {
+            syncIndicator.style.opacity = '0';
+        }, 2000);
+    } else if (status === 'error') {
+        syncIndicator.textContent = '✗ Sync error';
+        setTimeout(() => {
+            syncIndicator.style.opacity = '0';
+        }, 3000);
+    }
+    
+    syncIndicator.style.opacity = '1';
 }
 
 function openAppModal() {
@@ -934,6 +1110,7 @@ function loadTasks() {
 
 function saveTasks() {
     chrome.storage.local.set({ tasks: tasks });
+    debouncedSync();
 }
 
 function formatDate(dateString) {
@@ -1092,6 +1269,7 @@ function loadReminders() {
 
 function saveReminders() {
     chrome.storage.local.set({ reminders: reminders });
+    debouncedSync();
 }
 
 function startReminderChecker() {
@@ -1604,7 +1782,10 @@ async function loadRssFeeds(cardId) {
 
 async function saveRssFeeds(cardId, feeds) {
     return new Promise((resolve) => {
-        chrome.storage.local.set({ [`rssFeeds_${cardId}`]: feeds }, resolve);
+        chrome.storage.local.set({ [`rssFeeds_${cardId}`]: feeds }, () => {
+            debouncedSync();
+            resolve();
+        });
     });
 }
 
@@ -1831,20 +2012,23 @@ async function checkAuthStatus() {
             chrome.storage.local.remove(['userInfo', 'authToken'], () => {
                 document.getElementById('signInBtn').style.display = 'block';
                 document.getElementById('userProfile').style.display = 'none';
+                currentUserId = null;
             });
             return;
         }
         
         const userInfo = await getUserInfo(token);
         if (userInfo) {
-            chrome.storage.local.set({ userInfo: userInfo, authToken: token }, () => {
+            chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                 updateAuthUI(userInfo);
+                await createOrUpdateUser(userInfo);
             });
         } else {
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
                     document.getElementById('signInBtn').style.display = 'block';
                     document.getElementById('userProfile').style.display = 'none';
+                    currentUserId = null;
                 });
             });
         }
@@ -1861,8 +2045,9 @@ async function signInWithGoogle() {
         if (token) {
             const userInfo = await getUserInfo(token);
             if (userInfo) {
-                chrome.storage.local.set({ userInfo: userInfo, authToken: token }, () => {
+                chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                     updateAuthUI(userInfo);
+                    await createOrUpdateUser(userInfo);
                 });
             }
         }
@@ -1876,6 +2061,7 @@ async function signOutFromGoogle() {
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
                     document.getElementById('userProfile').style.display = 'none';
                     document.getElementById('signInBtn').style.display = 'block';
+                    currentUserId = null;
                 });
             });
         }
