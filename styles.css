@@ -757,3 +757,28 @@ body {
     color: #9b9a97;
     margin-top: 2px;
 }
+
+.history-star-btn {
+    background: transparent;
+    border: none;
+    color: #fbbf24;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: 8px;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.history-star-btn:hover {
+    transform: scale(1.2);
+}
+
+.history-item.starred {
+    background: #fef3c7;
+    border-left: 3px solid #fbbf24;
+}
+
+.history-item.starred:hover {
+    background: #fde68a;
+}

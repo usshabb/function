@@ -1412,6 +1412,34 @@ async function fetchBrowsingHistory() {
     }
 }
 
+async function loadStarredSites() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['starredSites'], (result) => {
+            resolve(result.starredSites || []);
+        });
+    });
+}
+
+async function saveStarredSites(starredSites) {
+    return new Promise((resolve) => {
+        chrome.storage.local.set({ starredSites: starredSites }, resolve);
+    });
+}
+
+async function toggleStarredSite(domain) {
+    const starredSites = await loadStarredSites();
+    const index = starredSites.indexOf(domain);
+    
+    if (index > -1) {
+        starredSites.splice(index, 1);
+    } else {
+        starredSites.push(domain);
+    }
+    
+    await saveStarredSites(starredSites);
+    return starredSites.includes(domain);
+}
+
 async function renderHistoryCard(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
     
@@ -1424,14 +1452,31 @@ async function renderHistoryCard(cardEl, cardId) {
         return;
     }
     
+    const starredSites = await loadStarredSites();
+    
+    const starredList = topSites.filter(site => starredSites.includes(site.domain));
+    const unstarredList = topSites.filter(site => !starredSites.includes(site.domain));
+    const sortedSites = [...starredList, ...unstarredList];
+    
     content.innerHTML = '';
     
     const list = document.createElement('div');
     list.className = 'history-list';
+    list.id = `history-list-${cardId}`;
     
-    topSites.forEach((site, index) => {
+    sortedSites.forEach((site, index) => {
+        const isStarred = starredSites.includes(site.domain);
         const siteItem = document.createElement('div');
-        siteItem.className = 'history-item';
+        siteItem.className = 'history-item' + (isStarred ? ' starred' : '');
+        
+        const rank = document.createElement('div');
+        rank.className = 'history-rank';
+        if (isStarred) {
+            rank.innerHTML = '📌';
+        } else {
+            const actualRank = index - starredList.length + 1;
+            rank.textContent = `#${actualRank}`;
+        }
         
         const favicon = document.createElement('img');
         favicon.className = 'history-favicon';
@@ -1455,16 +1500,28 @@ async function renderHistoryCard(cardEl, cardId) {
         siteInfo.appendChild(siteName);
         siteInfo.appendChild(siteCount);
         
-        const rank = document.createElement('div');
-        rank.className = 'history-rank';
-        rank.textContent = `#${index + 1}`;
+        const starBtn = document.createElement('button');
+        starBtn.className = 'history-star-btn';
+        starBtn.innerHTML = isStarred ? '★' : '☆';
+        starBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await toggleStarredSite(site.domain);
+            
+            const updatedCard = document.querySelector(`[data-id="${cardId}"]`);
+            if (updatedCard) {
+                renderHistoryCard(updatedCard, cardId);
+            }
+        });
         
         siteItem.appendChild(rank);
         siteItem.appendChild(favicon);
         siteItem.appendChild(siteInfo);
+        siteItem.appendChild(starBtn);
         
-        siteItem.addEventListener('click', () => {
-            window.open(`https://${site.domain}`, '_blank');
+        siteItem.addEventListener('click', (e) => {
+            if (e.target !== starBtn) {
+                window.open(`https://${site.domain}`, '_blank');
+            }
         });
         
         list.appendChild(siteItem);
