@@ -1,4 +1,4 @@
-CANVAS TAB - Chrome Extension Installation
+FUNCTION - Chrome Extension Installation
 
 This folder contains ONLY the Chrome extension files. Do NOT load the entire project folder.
 
@@ -10,7 +10,7 @@ INSTALLATION STEPS:
 5. The extension is now installed!
 
 USAGE:
-- Open a new tab to see your Canvas Tab workspace
+- Open a new tab to see your Function workspace
 - Sign in with Google to enable cloud sync across devices
 - Your data syncs automatically to the cloud (you'll see "Saving" and "Saved" indicators)
 

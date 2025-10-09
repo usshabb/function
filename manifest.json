@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Canvas Tab",
+  "name": "Function",
   "version": "1.0",
-  "description": "A Notion-like canvas for your new tab page",
+  "description": "A personalized dashboard for your new tab page",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
