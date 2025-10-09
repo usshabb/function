@@ -1,4 +1,4 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "nodejs-20"]
 [agent]
 expertMode = true
 integrations = ["python_database:1.0.0"]
@@ -19,21 +19,21 @@ args = "Backend"
 name = "Backend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
-waitForPort = 3000
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server.js"
+waitForPort = 3000
 
 [[ports]]
 localPort = 3000
 externalPort = 3000
 
 [[ports]]
-localPort = 5000
-externalPort = 80
+localPort = 35939
+externalPort = 3001
 
 [[ports]]
 localPort = 44045

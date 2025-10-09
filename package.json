@@ -1,0 +1,24 @@
+{
+  "name": "canvas-tab-backend",
+  "version": "1.0.0",
+  "description": "Node.js backend for Canvas Tab Chrome extension",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "canvas",
+    "tab",
+    "chrome",
+    "extension"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mongoose": "^8.19.1"
+  }
+}
