@@ -8,3 +8,6 @@ __pycache__/
 venv/
 ENV/
 .DS_Store
+node_modules/
+*.log
+.env

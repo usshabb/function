@@ -29,6 +29,7 @@ mongoose.connect(MONGODB_URI)
 const User = require('./models/User');
 const UserState = require('./models/UserState');
 const UserToken = require('./models/UserToken');
+const RSSSource = require('./models/RSSSource');
 
 // Health check
 app.get('/health', (req, res) => {
@@ -163,6 +164,46 @@ app.delete('/api/tokens/:user_id/:token_type', async (req, res) => {
         res.json({ message: 'Token deleted successfully' });
     } catch (error) {
         console.error('Delete token error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// RSS Source routes
+app.get('/api/rss-sources', async (req, res) => {
+    try {
+        const { category } = req.query;
+        const filter = category ? { category } : {};
+        
+        const sources = await RSSSource.find(filter).sort({ category: 1, name: 1 });
+        
+        // Group by category
+        const groupedSources = sources.reduce((acc, source) => {
+            if (!acc[source.category]) {
+                acc[source.category] = [];
+            }
+            acc[source.category].push({
+                _id: source._id,
+                name: source.name,
+                url: source.url,
+                category: source.category,
+                favicon: source.favicon
+            });
+            return acc;
+        }, {});
+        
+        res.json({ sources: groupedSources });
+    } catch (error) {
+        console.error('Get RSS sources error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/rss-sources/categories', async (req, res) => {
+    try {
+        const categories = await RSSSource.distinct('category');
+        res.json({ categories: categories.sort() });
+    } catch (error) {
+        console.error('Get categories error:', error);
         res.status(500).json({ error: error.message });
     }
 });
