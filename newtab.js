@@ -1645,6 +1645,37 @@ async function toggleStarredSite(domain) {
     return starredSites.includes(domain);
 }
 
+async function loadToggledSites() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['toggledSites'], (result) => {
+            resolve(result.toggledSites || []);
+        });
+    });
+}
+
+async function saveToggledSites(toggledSites) {
+    return new Promise((resolve) => {
+        chrome.storage.local.set({ toggledSites: toggledSites }, () => {
+            debouncedSync();
+            resolve();
+        });
+    });
+}
+
+async function toggleSiteForOpening(domain) {
+    const toggledSites = await loadToggledSites();
+    const index = toggledSites.indexOf(domain);
+    
+    if (index > -1) {
+        toggledSites.splice(index, 1);
+    } else {
+        toggledSites.push(domain);
+    }
+    
+    await saveToggledSites(toggledSites);
+    return toggledSites.includes(domain);
+}
+
 async function renderHistoryCard(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
     
@@ -1658,6 +1689,7 @@ async function renderHistoryCard(cardEl, cardId) {
     }
     
     const starredSites = await loadStarredSites();
+    const toggledSites = await loadToggledSites();
     
     const sitesWithRank = topSites.map((site, index) => ({
         ...site,
@@ -1670,14 +1702,46 @@ async function renderHistoryCard(cardEl, cardId) {
     
     content.innerHTML = '';
     
+    const header = document.createElement('div');
+    header.className = 'history-header';
+    
+    const openTabsBtn = document.createElement('button');
+    openTabsBtn.className = 'open-tabs-btn';
+    openTabsBtn.textContent = `Open Tabs (${toggledSites.length})`;
+    openTabsBtn.disabled = toggledSites.length === 0;
+    openTabsBtn.addEventListener('click', async () => {
+        const sitesToOpen = await loadToggledSites();
+        sitesToOpen.forEach(domain => {
+            window.open(`https://${domain}`, '_blank');
+        });
+    });
+    
+    header.appendChild(openTabsBtn);
+    content.appendChild(header);
+    
     const list = document.createElement('div');
     list.className = 'history-list';
     list.id = `history-list-${cardId}`;
     
     sortedSites.forEach((site) => {
         const isStarred = starredSites.includes(site.domain);
+        const isToggled = toggledSites.includes(site.domain);
         const siteItem = document.createElement('div');
         siteItem.className = 'history-item' + (isStarred ? ' starred' : '');
+        
+        const toggleCheckbox = document.createElement('input');
+        toggleCheckbox.type = 'checkbox';
+        toggleCheckbox.className = 'history-toggle';
+        toggleCheckbox.checked = isToggled;
+        toggleCheckbox.addEventListener('change', async (e) => {
+            e.stopPropagation();
+            await toggleSiteForOpening(site.domain);
+            
+            const updatedCard = document.querySelector(`[data-id="${cardId}"]`);
+            if (updatedCard) {
+                renderHistoryCard(updatedCard, cardId);
+            }
+        });
         
         const rank = document.createElement('div');
         rank.className = 'history-rank';
@@ -1722,13 +1786,14 @@ async function renderHistoryCard(cardEl, cardId) {
             }
         });
         
+        siteItem.appendChild(toggleCheckbox);
         siteItem.appendChild(rank);
         siteItem.appendChild(favicon);
         siteItem.appendChild(siteInfo);
         siteItem.appendChild(starBtn);
         
         siteItem.addEventListener('click', (e) => {
-            if (e.target !== starBtn) {
+            if (e.target !== starBtn && e.target !== toggleCheckbox) {
                 window.open(`https://${site.domain}`, '_blank');
             }
         });
