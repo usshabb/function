@@ -262,6 +262,9 @@ app.get('/api/rss-sources/categories', async (req, res) => {
         res.json({ categories: categories.sort() });
     } catch (error) {
         console.error('Get categories error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Logout route - clears user session data
 app.post('/api/logout/:user_id', async (req, res) => {
