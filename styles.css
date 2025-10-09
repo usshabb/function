@@ -1020,3 +1020,96 @@ body {
 .rss-add-btn:hover {
     background: #1a6ec7;
 }
+
+.rss-date-group {
+    font-size: 12px;
+    font-weight: 600;
+    color: #9b9a97;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.rss-date-group:first-child {
+    margin-top: 0;
+}
+
+.rss-article-favicon {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    border-radius: 2px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.rss-feed-favicon {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.rss-explorer {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.rss-category-section {
+    margin-bottom: 16px;
+}
+
+.rss-category-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #37352f;
+    margin-bottom: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.rss-toggle-btn {
+    background: transparent;
+    border: 1px solid #e1e1e1;
+    color: #9b9a97;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.rss-toggle-btn:hover {
+    background: #f7f6f3;
+    border-color: #9b9a97;
+}
+
+.rss-toggle-btn.subscribed {
+    background: #2383e2;
+    border-color: #2383e2;
+    color: white;
+}
+
+.rss-toggle-btn.subscribed:hover {
+    background: #1a6ec7;
+    border-color: #1a6ec7;
+}
+
+.rss-feed-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.rss-empty-state {
+    flex: 1;
+}

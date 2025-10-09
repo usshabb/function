@@ -10,54 +10,12 @@ const API_URL = 'http://localhost:3000';
 let syncTimeout = null;
 let currentUserId = null;
 
-// Logging system
-const Logger = {
-    isDev: window.location.href.includes('localhost') || window.location.protocol === 'chrome-extension:',
-    
-    debug: function(message, data = null) {
-        if (this.isDev) {
-            console.log(`[DEBUG] ${new Date().toISOString()}: ${message}`, data || '');
-        }
-    },
-    
-    info: function(message, data = null) {
-        if (this.isDev) {
-            console.info(`[INFO] ${new Date().toISOString()}: ${message}`, data || '');
-        }
-    },
-    
-    warn: function(message, data = null) {
-        console.warn(`[WARN] ${new Date().toISOString()}: ${message}`, data || '');
-    },
-    
-    error: function(message, error = null) {
-        console.error(`[ERROR] ${new Date().toISOString()}: ${message}`, error || '');
-    },
-    
-    auth: function(message, data = null) {
-        if (this.isDev) {
-            console.log(`[AUTH] ${new Date().toISOString()}: ${message}`, data || '');
-        }
-    },
-    
-    api: function(message, data = null) {
-        if (this.isDev) {
-            console.log(`[API] ${new Date().toISOString()}: ${message}`, data || '');
-        }
-    }
-};
-
 document.addEventListener('DOMContentLoaded', () => {
-    Logger.debug('Application started, initializing...');
-    
     loadCards();
     loadTasks();
     loadReminders();
     startReminderChecker();
     checkAuthStatus();
-    
-    // Show login UI by default, hide navigation
-    showLoginInterface();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
@@ -78,106 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAppModal();
         }
     });
-    
-    Logger.debug('Application initialization completed');
 });
-
-// UI control functions for authentication state
-function showLoginInterface() {
-    Logger.debug('Showing login interface, hiding navigation');
-
-    // Hide the entire toolbar
-    const toolbar = document.querySelector('.toolbar');
-    if (toolbar) {
-        toolbar.style.display = 'none';
-    }
-
-    // Hide any existing cards/content that requires auth
-    const canvas = document.getElementById('canvas');
-    if (canvas) {
-        canvas.style.display = 'none';
-    }
-
-    // Show a login prompt in the center
-    showLoginPrompt();
-}
-
-function showAuthenticatedInterface() {
-    Logger.debug('Showing authenticated interface, showing navigation');
-
-    // Show the entire toolbar
-    const toolbar = document.querySelector('.toolbar');
-    if (toolbar) {
-        toolbar.style.display = 'flex';
-    }
-
-    // Show navigation buttons
-    const toolbarLeft = document.querySelector('.toolbar-left');
-    if (toolbarLeft) {
-        toolbarLeft.style.display = 'flex';
-    }
-
-    // Show canvas for content
-    const canvas = document.getElementById('canvas');
-    if (canvas) {
-        canvas.style.display = 'block';
-    }
-
-    // Hide login prompt
-    hideLoginPrompt();
-}
-
-function showLoginPrompt() {
-    // Remove existing login prompt
-    const existingPrompt = document.getElementById('loginPrompt');
-    if (existingPrompt) {
-        existingPrompt.remove();
-    }
-    
-    // Create login prompt
-    const loginPrompt = document.createElement('div');
-    loginPrompt.id = 'loginPrompt';
-    loginPrompt.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        text-align: center;
-        z-index: 1000;
-    `;
-    
-    loginPrompt.innerHTML = `
-        <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px;">
-            <h1 style="margin: 0 0 20px 0; color: #37352f; font-size: 28px; font-weight: 600;">Welcome to Function</h1>
-            <p style="margin: 0 0 30px 0; color: #9b9a97; font-size: 16px;">Sign in with Google to start using your personalized dashboard with notes, apps, and more.</p>
-            <button id="centerSignInBtn" style="
-                background: #2383e2;
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-size: 16px;
-                cursor: pointer;
-                font-weight: 500;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='#1c6ec7'" onmouseout="this.style.background='#2383e2'">
-                Sign in with Google
-            </button>
-        </div>
-    `;
-    
-    document.body.appendChild(loginPrompt);
-    
-    // Add click handler
-    document.getElementById('centerSignInBtn').addEventListener('click', signInWithGoogle);
-}
-
-function hideLoginPrompt() {
-    const loginPrompt = document.getElementById('loginPrompt');
-    if (loginPrompt) {
-        loginPrompt.remove();
-    }
-}
 
 function updateCanvasHeight() {
     const canvas = document.getElementById('canvas');
@@ -200,8 +59,6 @@ function updateCanvasHeight() {
 }
 
 function createCard(type, data = {}) {
-    Logger.debug(`Creating ${type} card`, { id: Date.now().toString() });
-    
     const card = {
         id: Date.now().toString(),
         type: type,
@@ -214,8 +71,6 @@ function createCard(type, data = {}) {
     renderCard(card);
     saveCards();
     updateCanvasHeight();
-    
-    Logger.debug(`${type} card created successfully`, { totalCards: cards.length });
 }
 
 function renderCard(card) {
@@ -457,18 +312,14 @@ function deleteCard(cardId) {
 }
 
 function saveCards() {
-    Logger.debug('Saving cards to local storage', { cardCount: cards.length });
     chrome.storage.local.set({ cards: cards });
     debouncedSync();
 }
 
 function loadCards() {
-    Logger.debug('Loading cards from local storage');
-    
     chrome.storage.local.get(['cards'], (result) => {
         if (result.cards) {
             cards = result.cards;
-            Logger.debug('Cards loaded from storage', { cardCount: cards.length });
             
             let needsSave = false;
             cards.forEach(card => {
@@ -476,25 +327,20 @@ function loadCards() {
                     try {
                         const oldData = JSON.parse(card.content);
                         if (oldData.token) {
-                            Logger.debug('Removing legacy token from mercury card', { cardId: card.id });
                             card.content = '';
                             needsSave = true;
                         }
                     } catch (e) {
-                        Logger.debug('Error parsing mercury card content', e);
                     }
                 }
             });
             
             if (needsSave) {
-                Logger.debug('Saving cards after token cleanup');
                 saveCards();
             }
             
             cards.forEach(card => renderCard(card));
             updateCanvasHeight();
-        } else {
-            Logger.debug('No cards found in storage');
         }
     });
 }
@@ -512,13 +358,9 @@ function debouncedSync() {
 }
 
 async function syncStateToBackend() {
-    if (!currentUserId) {
-        Logger.debug('Skipping sync - no user ID');
-        return;
-    }
+    if (!currentUserId) return;
     
     try {
-        Logger.api('Starting state sync to backend', { userId: currentUserId });
         showSyncStatus('saving');
         
         const state = {
@@ -529,12 +371,6 @@ async function syncStateToBackend() {
             rssFeeds: await getAllRssFeeds()
         };
         
-        Logger.api('State prepared for sync', { 
-            cardCount: cards.length, 
-            taskCount: tasks.length, 
-            reminderCount: reminders.length 
-        });
-        
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`, {
             method: 'POST',
             headers: {
@@ -544,106 +380,59 @@ async function syncStateToBackend() {
         });
         
         if (response.ok) {
-            Logger.api('State synced successfully');
             showSyncStatus('saved');
         } else {
-            Logger.error('Sync failed', { status: response.status });
             showSyncStatus('error');
         }
     } catch (error) {
-        Logger.error('Sync error', error);
+        console.error('Sync error:', error);
         showSyncStatus('error');
     }
 }
 
 async function loadStateFromBackend() {
-    if (!currentUserId) {
-        Logger.debug('Skipping state load - no user ID');
-        return;
-    }
-
+    if (!currentUserId) return;
+    
     try {
-        Logger.api('Loading state from backend', { userId: currentUserId });
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`);
         const data = await response.json();
-
+        
         if (data.state && Object.keys(data.state).length > 0) {
-            Logger.api('State loaded from backend', { hasData: true });
-
             if (data.state.cards) {
-                Logger.debug('Restoring cards from backend', { count: data.state.cards.length });
                 cards = data.state.cards;
                 chrome.storage.local.set({ cards: cards });
                 document.getElementById('canvas').innerHTML = '';
                 cards.forEach(card => renderCard(card));
                 updateCanvasHeight();
             }
-
+            
             if (data.state.tasks) {
-                Logger.debug('Restoring tasks from backend', { count: data.state.tasks.length });
                 tasks = data.state.tasks;
                 chrome.storage.local.set({ tasks: tasks });
             }
-
+            
             if (data.state.reminders) {
-                Logger.debug('Restoring reminders from backend', { count: data.state.reminders.length });
                 reminders = data.state.reminders;
                 chrome.storage.local.set({ reminders: reminders });
             }
-
+            
             if (data.state.starredSites) {
-                Logger.debug('Restoring starred sites from backend');
                 chrome.storage.local.set({ starredSites: data.state.starredSites });
             }
-
+            
             if (data.state.rssFeeds) {
-                Logger.debug('Restoring RSS feeds from backend');
                 for (const [cardId, feeds] of Object.entries(data.state.rssFeeds)) {
                     chrome.storage.local.set({ [`rssFeeds_${cardId}`]: feeds });
                 }
             }
-        } else {
-            Logger.api('No state data found on backend');
-        }
-
-        // Load Mercury token from database
-        await loadMercuryTokenFromBackend();
-    } catch (error) {
-        Logger.error('Load state error', error);
-    }
-}
-
-async function loadMercuryTokenFromBackend() {
-    if (!currentUserId) {
-        return;
-    }
-
-    try {
-        Logger.api('Loading Mercury token from backend', { userId: currentUserId });
-        const response = await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`);
-        const data = await response.json();
-
-        if (data.token) {
-            Logger.debug('Mercury token found, restoring to local storage');
-            chrome.storage.local.set({
-                mercuryToken: data.token,
-                mercuryConnected: true
-            });
-        } else {
-            Logger.debug('No Mercury token found in database');
         }
     } catch (error) {
-        Logger.error('Error loading Mercury token from backend', error);
+        console.error('Load state error:', error);
     }
 }
 
 async function createOrUpdateUser(userInfo) {
     try {
-        Logger.api('Creating/updating user in backend', { 
-            userId: userInfo.id, 
-            email: userInfo.email 
-        });
-        
         const response = await fetch(`${API_URL}/api/user`, {
             method: 'POST',
             headers: {
@@ -658,15 +447,12 @@ async function createOrUpdateUser(userInfo) {
         });
         
         if (response.ok) {
-            Logger.api('User created/updated successfully');
             currentUserId = userInfo.id;
             await migrateLocalDataToBackend();
             await loadStateFromBackend();
-        } else {
-            Logger.error('Failed to create/update user', { status: response.status });
         }
     } catch (error) {
-        Logger.error('User creation error', error);
+        console.error('User creation error:', error);
     }
 }
 
@@ -768,52 +554,21 @@ function handleAppSelection(appType) {
     }
 }
 
-async function promptMercuryToken() {
+function promptMercuryToken() {
     closeAppModal();
-
-    // Check if user is already connected
-    if (currentUserId) {
-        try {
-            const response = await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`);
-            const data = await response.json();
-
-            if (data.token) {
-                // Already connected, create card
-                chrome.storage.local.set({ mercuryToken: data.token, mercuryConnected: true }, () => {
+    
+    chrome.storage.local.get(['mercuryConnected'], (result) => {
+        if (result.mercuryConnected) {
+            createMercuryCard();
+        } else {
+            const token = prompt('Enter your Mercury API token:');
+            if (token && token.trim()) {
+                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, () => {
                     createMercuryCard();
                 });
-                return;
             }
-        } catch (error) {
-            Logger.error('Error checking Mercury connection', error);
         }
-    }
-
-    // Not connected, prompt for token
-    const token = prompt('Enter your Mercury API token:');
-    if (token && token.trim()) {
-        const trimmedToken = token.trim();
-
-        // Save to local storage
-        chrome.storage.local.set({ mercuryToken: trimmedToken, mercuryConnected: true }, async () => {
-            // Save to database if user is logged in
-            if (currentUserId) {
-                try {
-                    await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ token: trimmedToken })
-                    });
-                    Logger.api('Mercury token saved to database');
-                } catch (error) {
-                    Logger.error('Error saving Mercury token to database', error);
-                }
-            }
-            createMercuryCard();
-        });
-    }
+    });
 }
 
 async function createMercuryCard() {
@@ -880,7 +635,7 @@ async function fetchMercuryData(token) {
 function renderMercuryCard(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
     content.innerHTML = '<div class="loading">Loading Mercury data...</div>';
-
+    
     chrome.storage.local.get(['mercuryToken'], (result) => {
         if (!result.mercuryToken) {
             content.innerHTML = `
@@ -888,26 +643,15 @@ function renderMercuryCard(cardEl, cardId) {
                 <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
             `;
             const btn = content.querySelector('.connect-btn');
-            btn.addEventListener('click', async () => {
-                // Clear token from both local storage and database
-                chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], async () => {
-                    if (currentUserId) {
-                        try {
-                            await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
-                                method: 'DELETE'
-                            });
-                            Logger.api('Mercury token deleted from database');
-                        } catch (error) {
-                            Logger.error('Error deleting Mercury token from database', error);
-                        }
-                    }
+            btn.addEventListener('click', () => {
+                chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
                     deleteCard(cardId);
                     promptMercuryToken();
                 });
             });
             return;
         }
-
+        
         fetchMercuryData(result.mercuryToken).then(mercuryData => {
             if (!mercuryData) {
                 content.innerHTML = `
@@ -917,31 +661,20 @@ function renderMercuryCard(cardEl, cardId) {
                 `;
                 const updateBtn = content.querySelectorAll('.connect-btn')[0];
                 const retryBtn = content.querySelectorAll('.connect-btn')[1];
-
-                updateBtn.addEventListener('click', async () => {
-                    // Clear token from both local storage and database
-                    chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], async () => {
-                        if (currentUserId) {
-                            try {
-                                await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
-                                    method: 'DELETE'
-                                });
-                                Logger.api('Mercury token deleted from database');
-                            } catch (error) {
-                                Logger.error('Error deleting Mercury token from database', error);
-                            }
-                        }
+                
+                updateBtn.addEventListener('click', () => {
+                    chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
                         deleteCard(cardId);
                         promptMercuryToken();
                     });
                 });
-
+                
                 retryBtn.addEventListener('click', () => {
                     renderMercuryCard(cardEl, cardId);
                 });
                 return;
             }
-
+        
         content.innerHTML = `
             <div class="app-connected">✓ Connected to Mercury</div>
             <div class="account-label">${mercuryData.accountName}</div>
@@ -949,26 +682,26 @@ function renderMercuryCard(cardEl, cardId) {
             <div class="account-label">Recent Transactions</div>
             <div class="transactions-list" id="transactions-${cardId}"></div>
         `;
-
+        
         const transactionsList = content.querySelector(`#transactions-${cardId}`);
-
+        
         if (mercuryData.transactions.length === 0) {
             transactionsList.innerHTML = '<div style="color: #9b9a97; font-size: 13px; padding: 8px 0;">No recent transactions</div>';
         } else {
             mercuryData.transactions.forEach(transaction => {
                 const transactionEl = document.createElement('div');
                 transactionEl.className = 'transaction-item';
-
+                
                 const amount = transaction.amount;
                 const isPositive = amount > 0;
-
+                
                 transactionEl.innerHTML = `
                     <div class="transaction-description">${transaction.description || transaction.counterpartyName || 'Transaction'}</div>
                     <div class="transaction-amount ${isPositive ? 'positive' : 'negative'}">
                         ${isPositive ? '+' : ''}$${Math.abs(amount).toFixed(2)}
                     </div>
                 `;
-
+                
                 transactionsList.appendChild(transactionEl);
             });
         }
@@ -2004,13 +1737,7 @@ async function renderHistoryCard(cardEl, cardId) {
     content.appendChild(list);
 }
 
-const DEFAULT_RSS_FEEDS = [
-    { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
-    { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml' },
-    { name: 'Hacker News', url: 'https://news.ycombinator.com/rss' },
-    { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
-    { name: 'Wired', url: 'https://www.wired.com/feed/rss' }
-];
+const DEFAULT_RSS_FEEDS = [];
 
 async function fetchRssFeed(feedUrl) {
     const CORS_PROXY = 'https://api.cors.lol/?url=';
@@ -2067,7 +1794,8 @@ async function renderRssCard(cardEl, cardId) {
         articles.forEach(article => {
             allArticles.push({
                 ...article,
-                source: feed.name
+                source: feed.name,
+                favicon: feed.favicon
             });
         });
     }
@@ -2078,109 +1806,144 @@ async function renderRssCard(cardEl, cardId) {
         return dateB - dateA;
     });
     
-    const latestArticles = allArticles.slice(0, 5);
-    
     content.innerHTML = '';
     
     const header = document.createElement('div');
     header.className = 'rss-header';
     
     const title = document.createElement('h3');
-    title.textContent = 'Latest Tech News';
+    title.textContent = 'Latest Articles';
     title.style.margin = '0 0 10px 0';
     title.style.fontSize = '16px';
     title.style.fontWeight = '600';
     
-    const manageBtn = document.createElement('button');
-    manageBtn.className = 'rss-manage-btn';
-    manageBtn.textContent = 'Manage Feeds';
-    manageBtn.addEventListener('click', () => showFeedManager(cardEl, cardId));
+    const exploreBtn = document.createElement('button');
+    exploreBtn.className = 'rss-manage-btn';
+    exploreBtn.textContent = 'Explore Feeds';
+    exploreBtn.addEventListener('click', () => showFeedExplorer(cardEl, cardId));
     
     header.appendChild(title);
-    header.appendChild(manageBtn);
+    header.appendChild(exploreBtn);
     content.appendChild(header);
     
-    if (latestArticles.length === 0) {
-        const noArticles = document.createElement('div');
-        noArticles.style.textAlign = 'center';
-        noArticles.style.padding = '20px';
-        noArticles.style.color = '#888';
-        noArticles.textContent = 'No articles found';
-        content.appendChild(noArticles);
+    if (allArticles.length === 0) {
+        const emptyState = document.createElement('div');
+        emptyState.className = 'rss-empty-state';
+        emptyState.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #888;">
+                <div style="font-size: 24px; margin-bottom: 12px;">📰</div>
+                <div style="font-weight: 500; margin-bottom: 8px;">No feeds yet</div>
+                <div style="font-size: 14px;">Click "Explore Feeds" to discover sources</div>
+            </div>
+        `;
+        content.appendChild(emptyState);
         return;
     }
     
     const articleList = document.createElement('div');
     articleList.className = 'rss-article-list';
     
-    latestArticles.forEach(article => {
-        const articleEl = document.createElement('a');
-        articleEl.className = 'rss-article';
-        articleEl.href = article.link;
-        articleEl.target = '_blank';
+    const groupedArticles = groupArticlesByDate(allArticles);
+    
+    Object.keys(groupedArticles).forEach(dateGroup => {
+        if (groupedArticles[dateGroup].length === 0) return;
         
-        const articleTitle = document.createElement('div');
-        articleTitle.className = 'rss-article-title';
-        articleTitle.textContent = article.title;
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'rss-date-group';
+        groupHeader.textContent = dateGroup;
+        articleList.appendChild(groupHeader);
         
-        const articleMeta = document.createElement('div');
-        articleMeta.className = 'rss-article-meta';
-        
-        const source = document.createElement('span');
-        source.textContent = article.source;
-        
-        const date = document.createElement('span');
-        if (article.pubDate) {
-            const pubDate = new Date(article.pubDate);
-            const now = new Date();
-            const diffTime = Math.abs(now - pubDate);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+        groupedArticles[dateGroup].forEach(article => {
+            const articleEl = document.createElement('a');
+            articleEl.className = 'rss-article';
+            articleEl.href = article.link;
+            articleEl.target = '_blank';
             
-            if (diffDays === 0) {
-                if (diffHours === 0) {
-                    date.textContent = 'Just now';
-                } else if (diffHours === 1) {
-                    date.textContent = '1 hour ago';
-                } else {
-                    date.textContent = `${diffHours} hours ago`;
-                }
-            } else if (diffDays === 1) {
-                date.textContent = 'Yesterday';
-            } else if (diffDays < 7) {
-                date.textContent = `${diffDays} days ago`;
-            } else {
-                date.textContent = pubDate.toLocaleDateString();
+            const articleTitle = document.createElement('div');
+            articleTitle.className = 'rss-article-title';
+            articleTitle.textContent = article.title;
+            
+            const articleMeta = document.createElement('div');
+            articleMeta.className = 'rss-article-meta';
+            
+            if (article.favicon) {
+                const favicon = document.createElement('img');
+                favicon.src = article.favicon;
+                favicon.className = 'rss-article-favicon';
+                favicon.onerror = () => favicon.style.display = 'none';
+                articleMeta.appendChild(favicon);
             }
-        }
-        
-        articleMeta.appendChild(source);
-        if (article.pubDate) {
-            const separator = document.createElement('span');
-            separator.textContent = ' • ';
-            articleMeta.appendChild(separator);
-            articleMeta.appendChild(date);
-        }
-        
-        articleEl.appendChild(articleTitle);
-        articleEl.appendChild(articleMeta);
-        articleList.appendChild(articleEl);
+            
+            const source = document.createElement('span');
+            source.textContent = article.source;
+            articleMeta.appendChild(source);
+            
+            articleEl.appendChild(articleTitle);
+            articleEl.appendChild(articleMeta);
+            articleList.appendChild(articleEl);
+        });
     });
     
     content.appendChild(articleList);
 }
 
-function showFeedManager(cardEl, cardId) {
-    const content = cardEl.querySelector('.card-content');
+function groupArticlesByDate(articles) {
+    const groups = {
+        'Today': [],
+        'Yesterday': [],
+        'This Week': [],
+        'Earlier': []
+    };
     
-    loadRssFeeds(cardId).then(feeds => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    articles.forEach(article => {
+        if (!article.pubDate) {
+            groups['Earlier'].push(article);
+            return;
+        }
+        
+        const pubDate = new Date(article.pubDate);
+        const articleDate = new Date(pubDate.getFullYear(), pubDate.getMonth(), pubDate.getDate());
+        
+        if (articleDate.getTime() === today.getTime()) {
+            groups['Today'].push(article);
+        } else if (articleDate.getTime() === yesterday.getTime()) {
+            groups['Yesterday'].push(article);
+        } else if (articleDate >= weekAgo) {
+            groups['This Week'].push(article);
+        } else {
+            groups['Earlier'].push(article);
+        }
+    });
+    
+    return groups;
+}
+
+async function showFeedExplorer(cardEl, cardId) {
+    const content = cardEl.querySelector('.card-content');
+    content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Loading sources...</div>';
+    
+    try {
+        const subscribedFeeds = await loadRssFeeds(cardId);
+        const subscribedUrls = new Set(subscribedFeeds.map(f => f.url));
+        
+        const response = await fetch(`${API_URL}/api/rss-sources`);
+        const data = await response.json();
+        const groupedSources = data.sources;
+        
         content.innerHTML = '';
         
         const header = document.createElement('div');
         header.className = 'rss-header';
         
         const title = document.createElement('h3');
-        title.textContent = 'Manage RSS Feeds';
+        title.textContent = 'Explore Feeds';
         title.style.margin = '0 0 10px 0';
         title.style.fontSize = '16px';
         title.style.fontWeight = '600';
@@ -2194,110 +1957,100 @@ function showFeedManager(cardEl, cardId) {
         header.appendChild(backBtn);
         content.appendChild(header);
         
-        const feedList = document.createElement('div');
-        feedList.className = 'rss-feed-list';
+        const feedExplorer = document.createElement('div');
+        feedExplorer.className = 'rss-explorer';
         
-        feeds.forEach((feed, index) => {
-            const feedItem = document.createElement('div');
-            feedItem.className = 'rss-feed-item';
+        Object.keys(groupedSources).sort().forEach(category => {
+            const categorySection = document.createElement('div');
+            categorySection.className = 'rss-category-section';
             
-            const feedInfo = document.createElement('div');
-            feedInfo.className = 'rss-feed-info';
+            const categoryHeader = document.createElement('div');
+            categoryHeader.className = 'rss-category-header';
+            categoryHeader.textContent = category;
+            categorySection.appendChild(categoryHeader);
             
-            const feedName = document.createElement('div');
-            feedName.className = 'rss-feed-name';
-            feedName.textContent = feed.name;
-            
-            const feedUrl = document.createElement('div');
-            feedUrl.className = 'rss-feed-url';
-            feedUrl.textContent = feed.url;
-            
-            feedInfo.appendChild(feedName);
-            feedInfo.appendChild(feedUrl);
-            
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'rss-remove-btn';
-            removeBtn.textContent = '×';
-            removeBtn.addEventListener('click', async () => {
-                feeds.splice(index, 1);
-                await saveRssFeeds(cardId, feeds);
-                showFeedManager(cardEl, cardId);
+            groupedSources[category].forEach(source => {
+                const feedItem = document.createElement('div');
+                feedItem.className = 'rss-feed-item';
+                
+                const feedInfo = document.createElement('div');
+                feedInfo.className = 'rss-feed-info';
+                
+                if (source.favicon) {
+                    const favicon = document.createElement('img');
+                    favicon.src = source.favicon;
+                    favicon.className = 'rss-feed-favicon';
+                    favicon.onerror = () => favicon.style.display = 'none';
+                    feedInfo.appendChild(favicon);
+                }
+                
+                const feedName = document.createElement('div');
+                feedName.className = 'rss-feed-name';
+                feedName.textContent = source.name;
+                feedInfo.appendChild(feedName);
+                
+                const isSubscribed = subscribedUrls.has(source.url);
+                
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = `rss-toggle-btn ${isSubscribed ? 'subscribed' : ''}`;
+                toggleBtn.innerHTML = isSubscribed ? '✓' : '+';
+                toggleBtn.addEventListener('click', async () => {
+                    if (isSubscribed) {
+                        const index = subscribedFeeds.findIndex(f => f.url === source.url);
+                        if (index > -1) {
+                            subscribedFeeds.splice(index, 1);
+                            subscribedUrls.delete(source.url);
+                        }
+                    } else {
+                        subscribedFeeds.push({
+                            name: source.name,
+                            url: source.url,
+                            favicon: source.favicon
+                        });
+                        subscribedUrls.add(source.url);
+                    }
+                    
+                    await saveRssFeeds(cardId, subscribedFeeds);
+                    showFeedExplorer(cardEl, cardId);
+                });
+                
+                feedItem.appendChild(feedInfo);
+                feedItem.appendChild(toggleBtn);
+                categorySection.appendChild(feedItem);
             });
             
-            feedItem.appendChild(feedInfo);
-            feedItem.appendChild(removeBtn);
-            feedList.appendChild(feedItem);
+            feedExplorer.appendChild(categorySection);
         });
         
-        content.appendChild(feedList);
-        
-        const addSection = document.createElement('div');
-        addSection.className = 'rss-add-section';
-        
-        const addTitle = document.createElement('div');
-        addTitle.textContent = 'Add New Feed';
-        addTitle.style.fontSize = '14px';
-        addTitle.style.fontWeight = '600';
-        addTitle.style.marginBottom = '8px';
-        
-        const nameInput = document.createElement('input');
-        nameInput.className = 'rss-input';
-        nameInput.placeholder = 'Feed name (e.g., TechCrunch)';
-        
-        const urlInput = document.createElement('input');
-        urlInput.className = 'rss-input';
-        urlInput.placeholder = 'RSS feed URL';
-        
-        const addBtn = document.createElement('button');
-        addBtn.className = 'rss-add-btn';
-        addBtn.textContent = 'Add Feed';
-        addBtn.addEventListener('click', async () => {
-            const name = nameInput.value.trim();
-            const url = urlInput.value.trim();
-            
-            if (name && url) {
-                feeds.push({ name, url });
-                await saveRssFeeds(cardId, feeds);
-                showFeedManager(cardEl, cardId);
-            }
-        });
-        
-        addSection.appendChild(addTitle);
-        addSection.appendChild(nameInput);
-        addSection.appendChild(urlInput);
-        addSection.appendChild(addBtn);
-        
-        content.appendChild(addSection);
-    });
+        content.appendChild(feedExplorer);
+    } catch (error) {
+        console.error('Feed explorer error:', error);
+        content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Failed to load feeds</div>';
+    }
 }
 
 async function checkAuthStatus() {
-    Logger.auth('Checking authentication status');
-    
     chrome.identity.getAuthToken({ interactive: false }, async (token) => {
         if (chrome.runtime.lastError || !token) {
-            Logger.auth('No valid token found, showing login interface', chrome.runtime.lastError);
             chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                showLoginInterface();
+                document.getElementById('signInBtn').style.display = 'block';
+                document.getElementById('userProfile').style.display = 'none';
                 currentUserId = null;
             });
             return;
         }
         
-        Logger.auth('Token found, validating with Google API');
         const userInfo = await getUserInfo(token);
         if (userInfo) {
-            Logger.auth('User authenticated successfully', { email: userInfo.email, name: userInfo.name });
             chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                 updateAuthUI(userInfo);
-                showAuthenticatedInterface();
                 await createOrUpdateUser(userInfo);
             });
         } else {
-            Logger.auth('Token validation failed, removing cached token');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    showLoginInterface();
+                    document.getElementById('signInBtn').style.display = 'block';
+                    document.getElementById('userProfile').style.display = 'none';
                     currentUserId = null;
                 });
             });
@@ -2306,118 +2059,40 @@ async function checkAuthStatus() {
 }
 
 async function signInWithGoogle() {
-    Logger.auth('Starting Google sign-in process');
-    
     chrome.identity.getAuthToken({ interactive: true }, async (token) => {
         if (chrome.runtime.lastError) {
-            Logger.error('Authentication error during sign-in', chrome.runtime.lastError);
+            console.error('Auth error:', chrome.runtime.lastError);
             return;
         }
         
         if (token) {
-            Logger.auth('Sign-in token received, getting user info');
             const userInfo = await getUserInfo(token);
             if (userInfo) {
-                Logger.auth('Sign-in successful', { email: userInfo.email, name: userInfo.name });
                 chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                     updateAuthUI(userInfo);
-                    showAuthenticatedInterface();
                     await createOrUpdateUser(userInfo);
                 });
-            } else {
-                Logger.error('Failed to get user info after sign-in');
             }
-        } else {
-            Logger.error('No token received during sign-in');
         }
     });
 }
 
 async function signOutFromGoogle() {
-    Logger.auth('Starting sign-out process');
-
-    chrome.storage.local.get(['authToken'], async (result) => {
-        const token = result.authToken;
-        const userId = currentUserId;
-
-        const completeSignOut = () => {
-            Logger.auth('Clearing all local state');
-
-            // Clear ALL local storage
-            chrome.storage.local.clear(() => {
-                Logger.auth('All local storage cleared');
-
-                // Reset in-memory state
-                cards = [];
-                tasks = [];
-                reminders = [];
-                currentUserId = null;
-
-                // Clear the canvas
-                const canvas = document.getElementById('canvas');
-                if (canvas) {
-                    canvas.innerHTML = '';
-                }
-
-                Logger.auth('Sign-out completed, showing login interface');
-                showLoginInterface();
-            });
-        };
-
-        // Call backend logout endpoint to clear server-side session data
-        if (userId) {
-            try {
-                Logger.auth('Logging out from backend', { userId });
-                await fetch(`${API_URL}/api/logout/${userId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                Logger.auth('Backend logout successful');
-            } catch (error) {
-                Logger.warn('Backend logout failed', error);
-            }
-        }
-
-        if (token) {
-            Logger.auth('Revoking Google OAuth token');
-
-            // Revoke the token with Google to force account picker on next sign-in
-            fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            })
-            .then(() => {
-                Logger.auth('Token revoked with Google');
-            })
-            .catch((error) => {
-                Logger.warn('Failed to revoke token with Google', error);
-            })
-            .finally(() => {
-                // Remove cached token from Chrome
-                chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                    Logger.auth('Cached token removed from Chrome');
-
-                    // Also clear all Chrome Identity tokens to force fresh login
-                    chrome.identity.clearAllCachedAuthTokens(() => {
-                        Logger.auth('All cached auth tokens cleared');
-                        completeSignOut();
-                    });
+    chrome.storage.local.get(['authToken'], (result) => {
+        if (result.authToken) {
+            chrome.identity.removeCachedAuthToken({ token: result.authToken }, () => {
+                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                    document.getElementById('userProfile').style.display = 'none';
+                    document.getElementById('signInBtn').style.display = 'block';
+                    currentUserId = null;
                 });
             });
-        } else {
-            Logger.auth('No auth token found during sign-out');
-            completeSignOut();
         }
     });
 }
 
 async function getUserInfo(token) {
     try {
-        Logger.api('Fetching user info from Google API');
         const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -2425,29 +2100,23 @@ async function getUserInfo(token) {
         });
         
         if (response.ok) {
-            const userInfo = await response.json();
-            Logger.api('User info retrieved successfully', { email: userInfo.email });
-            return userInfo;
+            return await response.json();
         }
         
         if (response.status === 401) {
-            Logger.warn('Token unauthorized, removing cached token');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                Logger.debug('Removed invalid cached token');
+                console.log('Removed invalid cached token');
             });
         }
         
-        Logger.error('Failed to fetch user info', { status: response.status });
         return null;
     } catch (error) {
-        Logger.error('Error fetching user info', error);
+        console.error('Error fetching user info:', error);
         return null;
     }
 }
 
 function updateAuthUI(userInfo) {
-    Logger.debug('Updating authentication UI', { name: userInfo.name, email: userInfo.email });
-    
     document.getElementById('signInBtn').style.display = 'none';
     document.getElementById('userProfile').style.display = 'flex';
     document.getElementById('userName').textContent = userInfo.name || userInfo.email;
