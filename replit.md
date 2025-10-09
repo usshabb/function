@@ -13,7 +13,7 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 - Reminder: Set timed reminders with banner alerts at the top of the page
 - SSENSE: Browse curated fashion products in a 3x5 grid with images, prices, and clickable links
 - Weather: Current weather for your location with temperature, conditions, and forecast
-- Top Sites: Ranked list of top 20 most visited websites from past 7 days with logos and visit counts. Users can star/pin favorite sites to keep them at the top while preserving original rank numbers for unstarred sites
+- Top Sites: Ranked list of top 20 most visited websites from past 7 days with logos and visit counts. Users can star/pin favorite sites to keep them at the top while preserving original rank numbers for unstarred sites. Each site has a toggle checkbox to mark it for opening, and an "Open Tabs" button at the top opens all toggled sites in new browser tabs at once
 - RSS Reader: Follow tech blogs and news sources with latest 5 articles displayed. Starts with 5 default feeds (TechCrunch, The Verge, Hacker News, Ars Technica, Wired). Users can add/remove custom RSS feeds via the Manage Feeds interface
 
 ## User Preferences
@@ -21,6 +21,12 @@ Canvas Tab is a browser extension that replaces the default new tab page with a 
 Preferred communication style: Simple, everyday language.
 
 ## Recent Updates
+
+**Top Sites Batch Opening (Added October 2025)**
+- Toggle checkboxes on each website to mark for opening
+- "Open Tabs" button opens all toggled sites in new browser tabs
+- Counter shows number of selected sites
+- Persists toggle state across browser sessions
 
 **Cloud Sync with PostgreSQL Backend (Added October 2025)**
 - Complete state synchronization across browsers and devices
