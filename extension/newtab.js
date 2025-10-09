@@ -5,17 +5,59 @@ let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
 
-const API_URL = 'https://76d9489c-0e19-4d83-beab-8f54819c405c-00-2y5fxagw85mdi.kirk.replit.dev:3000';
+const API_URL = 'http://localhost:3000';
 
 let syncTimeout = null;
 let currentUserId = null;
 
+// Logging system
+const Logger = {
+    isDev: window.location.href.includes('localhost') || window.location.protocol === 'chrome-extension:',
+    
+    debug: function(message, data = null) {
+        if (this.isDev) {
+            console.log(`[DEBUG] ${new Date().toISOString()}: ${message}`, data || '');
+        }
+    },
+    
+    info: function(message, data = null) {
+        if (this.isDev) {
+            console.info(`[INFO] ${new Date().toISOString()}: ${message}`, data || '');
+        }
+    },
+    
+    warn: function(message, data = null) {
+        console.warn(`[WARN] ${new Date().toISOString()}: ${message}`, data || '');
+    },
+    
+    error: function(message, error = null) {
+        console.error(`[ERROR] ${new Date().toISOString()}: ${message}`, error || '');
+    },
+    
+    auth: function(message, data = null) {
+        if (this.isDev) {
+            console.log(`[AUTH] ${new Date().toISOString()}: ${message}`, data || '');
+        }
+    },
+    
+    api: function(message, data = null) {
+        if (this.isDev) {
+            console.log(`[API] ${new Date().toISOString()}: ${message}`, data || '');
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    Logger.debug('Application started, initializing...');
+    
     loadCards();
     loadTasks();
     loadReminders();
     startReminderChecker();
     checkAuthStatus();
+    
+    // Show login UI by default, hide navigation
+    showLoginInterface();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
     document.getElementById('addLink').addEventListener('click', () => createCard('link'));
@@ -36,7 +78,106 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAppModal();
         }
     });
+    
+    Logger.debug('Application initialization completed');
 });
+
+// UI control functions for authentication state
+function showLoginInterface() {
+    Logger.debug('Showing login interface, hiding navigation');
+
+    // Hide the entire toolbar
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+        toolbar.style.display = 'none';
+    }
+
+    // Hide any existing cards/content that requires auth
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+        canvas.style.display = 'none';
+    }
+
+    // Show a login prompt in the center
+    showLoginPrompt();
+}
+
+function showAuthenticatedInterface() {
+    Logger.debug('Showing authenticated interface, showing navigation');
+
+    // Show the entire toolbar
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+        toolbar.style.display = 'flex';
+    }
+
+    // Show navigation buttons
+    const toolbarLeft = document.querySelector('.toolbar-left');
+    if (toolbarLeft) {
+        toolbarLeft.style.display = 'flex';
+    }
+
+    // Show canvas for content
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+        canvas.style.display = 'block';
+    }
+
+    // Hide login prompt
+    hideLoginPrompt();
+}
+
+function showLoginPrompt() {
+    // Remove existing login prompt
+    const existingPrompt = document.getElementById('loginPrompt');
+    if (existingPrompt) {
+        existingPrompt.remove();
+    }
+    
+    // Create login prompt
+    const loginPrompt = document.createElement('div');
+    loginPrompt.id = 'loginPrompt';
+    loginPrompt.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 1000;
+    `;
+    
+    loginPrompt.innerHTML = `
+        <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px;">
+            <h1 style="margin: 0 0 20px 0; color: #37352f; font-size: 28px; font-weight: 600;">Welcome to Function</h1>
+            <p style="margin: 0 0 30px 0; color: #9b9a97; font-size: 16px;">Sign in with Google to start using your personalized dashboard with notes, apps, and more.</p>
+            <button id="centerSignInBtn" style="
+                background: #2383e2;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#1c6ec7'" onmouseout="this.style.background='#2383e2'">
+                Sign in with Google
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(loginPrompt);
+    
+    // Add click handler
+    document.getElementById('centerSignInBtn').addEventListener('click', signInWithGoogle);
+}
+
+function hideLoginPrompt() {
+    const loginPrompt = document.getElementById('loginPrompt');
+    if (loginPrompt) {
+        loginPrompt.remove();
+    }
+}
 
 function updateCanvasHeight() {
     const canvas = document.getElementById('canvas');
@@ -59,6 +200,8 @@ function updateCanvasHeight() {
 }
 
 function createCard(type, data = {}) {
+    Logger.debug(`Creating ${type} card`, { id: Date.now().toString() });
+    
     const card = {
         id: Date.now().toString(),
         type: type,
@@ -71,6 +214,8 @@ function createCard(type, data = {}) {
     renderCard(card);
     saveCards();
     updateCanvasHeight();
+    
+    Logger.debug(`${type} card created successfully`, { totalCards: cards.length });
 }
 
 function renderCard(card) {
@@ -312,14 +457,18 @@ function deleteCard(cardId) {
 }
 
 function saveCards() {
+    Logger.debug('Saving cards to local storage', { cardCount: cards.length });
     chrome.storage.local.set({ cards: cards });
     debouncedSync();
 }
 
 function loadCards() {
+    Logger.debug('Loading cards from local storage');
+    
     chrome.storage.local.get(['cards'], (result) => {
         if (result.cards) {
             cards = result.cards;
+            Logger.debug('Cards loaded from storage', { cardCount: cards.length });
             
             let needsSave = false;
             cards.forEach(card => {
@@ -327,20 +476,25 @@ function loadCards() {
                     try {
                         const oldData = JSON.parse(card.content);
                         if (oldData.token) {
+                            Logger.debug('Removing legacy token from mercury card', { cardId: card.id });
                             card.content = '';
                             needsSave = true;
                         }
                     } catch (e) {
+                        Logger.debug('Error parsing mercury card content', e);
                     }
                 }
             });
             
             if (needsSave) {
+                Logger.debug('Saving cards after token cleanup');
                 saveCards();
             }
             
             cards.forEach(card => renderCard(card));
             updateCanvasHeight();
+        } else {
+            Logger.debug('No cards found in storage');
         }
     });
 }
@@ -358,9 +512,13 @@ function debouncedSync() {
 }
 
 async function syncStateToBackend() {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+        Logger.debug('Skipping sync - no user ID');
+        return;
+    }
     
     try {
+        Logger.api('Starting state sync to backend', { userId: currentUserId });
         showSyncStatus('saving');
         
         const state = {
@@ -371,6 +529,12 @@ async function syncStateToBackend() {
             rssFeeds: await getAllRssFeeds()
         };
         
+        Logger.api('State prepared for sync', { 
+            cardCount: cards.length, 
+            taskCount: tasks.length, 
+            reminderCount: reminders.length 
+        });
+        
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`, {
             method: 'POST',
             headers: {
@@ -380,59 +544,106 @@ async function syncStateToBackend() {
         });
         
         if (response.ok) {
+            Logger.api('State synced successfully');
             showSyncStatus('saved');
         } else {
+            Logger.error('Sync failed', { status: response.status });
             showSyncStatus('error');
         }
     } catch (error) {
-        console.error('Sync error:', error);
+        Logger.error('Sync error', error);
         showSyncStatus('error');
     }
 }
 
 async function loadStateFromBackend() {
-    if (!currentUserId) return;
-    
+    if (!currentUserId) {
+        Logger.debug('Skipping state load - no user ID');
+        return;
+    }
+
     try {
+        Logger.api('Loading state from backend', { userId: currentUserId });
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`);
         const data = await response.json();
-        
+
         if (data.state && Object.keys(data.state).length > 0) {
+            Logger.api('State loaded from backend', { hasData: true });
+
             if (data.state.cards) {
+                Logger.debug('Restoring cards from backend', { count: data.state.cards.length });
                 cards = data.state.cards;
                 chrome.storage.local.set({ cards: cards });
                 document.getElementById('canvas').innerHTML = '';
                 cards.forEach(card => renderCard(card));
                 updateCanvasHeight();
             }
-            
+
             if (data.state.tasks) {
+                Logger.debug('Restoring tasks from backend', { count: data.state.tasks.length });
                 tasks = data.state.tasks;
                 chrome.storage.local.set({ tasks: tasks });
             }
-            
+
             if (data.state.reminders) {
+                Logger.debug('Restoring reminders from backend', { count: data.state.reminders.length });
                 reminders = data.state.reminders;
                 chrome.storage.local.set({ reminders: reminders });
             }
-            
+
             if (data.state.starredSites) {
+                Logger.debug('Restoring starred sites from backend');
                 chrome.storage.local.set({ starredSites: data.state.starredSites });
             }
-            
+
             if (data.state.rssFeeds) {
+                Logger.debug('Restoring RSS feeds from backend');
                 for (const [cardId, feeds] of Object.entries(data.state.rssFeeds)) {
                     chrome.storage.local.set({ [`rssFeeds_${cardId}`]: feeds });
                 }
             }
+        } else {
+            Logger.api('No state data found on backend');
+        }
+
+        // Load Mercury token from database
+        await loadMercuryTokenFromBackend();
+    } catch (error) {
+        Logger.error('Load state error', error);
+    }
+}
+
+async function loadMercuryTokenFromBackend() {
+    if (!currentUserId) {
+        return;
+    }
+
+    try {
+        Logger.api('Loading Mercury token from backend', { userId: currentUserId });
+        const response = await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`);
+        const data = await response.json();
+
+        if (data.token) {
+            Logger.debug('Mercury token found, restoring to local storage');
+            chrome.storage.local.set({
+                mercuryToken: data.token,
+                mercuryConnected: true
+            });
+        } else {
+            Logger.debug('No Mercury token found in database');
         }
     } catch (error) {
-        console.error('Load state error:', error);
+        Logger.error('Error loading Mercury token from backend', error);
     }
 }
 
 async function createOrUpdateUser(userInfo) {
     try {
+        Logger.api('Creating/updating user in backend', { 
+            userId: userInfo.id, 
+            email: userInfo.email 
+        });
+        
         const response = await fetch(`${API_URL}/api/user`, {
             method: 'POST',
             headers: {
@@ -447,12 +658,15 @@ async function createOrUpdateUser(userInfo) {
         });
         
         if (response.ok) {
+            Logger.api('User created/updated successfully');
             currentUserId = userInfo.id;
             await migrateLocalDataToBackend();
             await loadStateFromBackend();
+        } else {
+            Logger.error('Failed to create/update user', { status: response.status });
         }
     } catch (error) {
-        console.error('User creation error:', error);
+        Logger.error('User creation error', error);
     }
 }
 
@@ -554,21 +768,52 @@ function handleAppSelection(appType) {
     }
 }
 
-function promptMercuryToken() {
+async function promptMercuryToken() {
     closeAppModal();
-    
-    chrome.storage.local.get(['mercuryConnected'], (result) => {
-        if (result.mercuryConnected) {
-            createMercuryCard();
-        } else {
-            const token = prompt('Enter your Mercury API token:');
-            if (token && token.trim()) {
-                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, () => {
+
+    // Check if user is already connected
+    if (currentUserId) {
+        try {
+            const response = await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`);
+            const data = await response.json();
+
+            if (data.token) {
+                // Already connected, create card
+                chrome.storage.local.set({ mercuryToken: data.token, mercuryConnected: true }, () => {
                     createMercuryCard();
                 });
+                return;
             }
+        } catch (error) {
+            Logger.error('Error checking Mercury connection', error);
         }
-    });
+    }
+
+    // Not connected, prompt for token
+    const token = prompt('Enter your Mercury API token:');
+    if (token && token.trim()) {
+        const trimmedToken = token.trim();
+
+        // Save to local storage
+        chrome.storage.local.set({ mercuryToken: trimmedToken, mercuryConnected: true }, async () => {
+            // Save to database if user is logged in
+            if (currentUserId) {
+                try {
+                    await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ token: trimmedToken })
+                    });
+                    Logger.api('Mercury token saved to database');
+                } catch (error) {
+                    Logger.error('Error saving Mercury token to database', error);
+                }
+            }
+            createMercuryCard();
+        });
+    }
 }
 
 async function createMercuryCard() {
@@ -635,7 +880,7 @@ async function fetchMercuryData(token) {
 function renderMercuryCard(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
     content.innerHTML = '<div class="loading">Loading Mercury data...</div>';
-    
+
     chrome.storage.local.get(['mercuryToken'], (result) => {
         if (!result.mercuryToken) {
             content.innerHTML = `
@@ -643,15 +888,26 @@ function renderMercuryCard(cardEl, cardId) {
                 <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
             `;
             const btn = content.querySelector('.connect-btn');
-            btn.addEventListener('click', () => {
-                chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
+            btn.addEventListener('click', async () => {
+                // Clear token from both local storage and database
+                chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], async () => {
+                    if (currentUserId) {
+                        try {
+                            await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                                method: 'DELETE'
+                            });
+                            Logger.api('Mercury token deleted from database');
+                        } catch (error) {
+                            Logger.error('Error deleting Mercury token from database', error);
+                        }
+                    }
                     deleteCard(cardId);
                     promptMercuryToken();
                 });
             });
             return;
         }
-        
+
         fetchMercuryData(result.mercuryToken).then(mercuryData => {
             if (!mercuryData) {
                 content.innerHTML = `
@@ -661,20 +917,31 @@ function renderMercuryCard(cardEl, cardId) {
                 `;
                 const updateBtn = content.querySelectorAll('.connect-btn')[0];
                 const retryBtn = content.querySelectorAll('.connect-btn')[1];
-                
-                updateBtn.addEventListener('click', () => {
-                    chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
+
+                updateBtn.addEventListener('click', async () => {
+                    // Clear token from both local storage and database
+                    chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], async () => {
+                        if (currentUserId) {
+                            try {
+                                await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                                    method: 'DELETE'
+                                });
+                                Logger.api('Mercury token deleted from database');
+                            } catch (error) {
+                                Logger.error('Error deleting Mercury token from database', error);
+                            }
+                        }
                         deleteCard(cardId);
                         promptMercuryToken();
                     });
                 });
-                
+
                 retryBtn.addEventListener('click', () => {
                     renderMercuryCard(cardEl, cardId);
                 });
                 return;
             }
-        
+
         content.innerHTML = `
             <div class="app-connected">✓ Connected to Mercury</div>
             <div class="account-label">${mercuryData.accountName}</div>
@@ -682,26 +949,26 @@ function renderMercuryCard(cardEl, cardId) {
             <div class="account-label">Recent Transactions</div>
             <div class="transactions-list" id="transactions-${cardId}"></div>
         `;
-        
+
         const transactionsList = content.querySelector(`#transactions-${cardId}`);
-        
+
         if (mercuryData.transactions.length === 0) {
             transactionsList.innerHTML = '<div style="color: #9b9a97; font-size: 13px; padding: 8px 0;">No recent transactions</div>';
         } else {
             mercuryData.transactions.forEach(transaction => {
                 const transactionEl = document.createElement('div');
                 transactionEl.className = 'transaction-item';
-                
+
                 const amount = transaction.amount;
                 const isPositive = amount > 0;
-                
+
                 transactionEl.innerHTML = `
                     <div class="transaction-description">${transaction.description || transaction.counterpartyName || 'Transaction'}</div>
                     <div class="transaction-amount ${isPositive ? 'positive' : 'negative'}">
                         ${isPositive ? '+' : ''}$${Math.abs(amount).toFixed(2)}
                     </div>
                 `;
-                
+
                 transactionsList.appendChild(transactionEl);
             });
         }
@@ -2005,27 +2272,32 @@ function showFeedManager(cardEl, cardId) {
 }
 
 async function checkAuthStatus() {
+    Logger.auth('Checking authentication status');
+    
     chrome.identity.getAuthToken({ interactive: false }, async (token) => {
         if (chrome.runtime.lastError || !token) {
+            Logger.auth('No valid token found, showing login interface', chrome.runtime.lastError);
             chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                document.getElementById('signInBtn').style.display = 'block';
-                document.getElementById('userProfile').style.display = 'none';
+                showLoginInterface();
                 currentUserId = null;
             });
             return;
         }
         
+        Logger.auth('Token found, validating with Google API');
         const userInfo = await getUserInfo(token);
         if (userInfo) {
+            Logger.auth('User authenticated successfully', { email: userInfo.email, name: userInfo.name });
             chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                 updateAuthUI(userInfo);
+                showAuthenticatedInterface();
                 await createOrUpdateUser(userInfo);
             });
         } else {
+            Logger.auth('Token validation failed, removing cached token');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    document.getElementById('signInBtn').style.display = 'block';
-                    document.getElementById('userProfile').style.display = 'none';
+                    showLoginInterface();
                     currentUserId = null;
                 });
             });
@@ -2034,40 +2306,118 @@ async function checkAuthStatus() {
 }
 
 async function signInWithGoogle() {
+    Logger.auth('Starting Google sign-in process');
+    
     chrome.identity.getAuthToken({ interactive: true }, async (token) => {
         if (chrome.runtime.lastError) {
-            console.error('Auth error:', chrome.runtime.lastError);
+            Logger.error('Authentication error during sign-in', chrome.runtime.lastError);
             return;
         }
         
         if (token) {
+            Logger.auth('Sign-in token received, getting user info');
             const userInfo = await getUserInfo(token);
             if (userInfo) {
+                Logger.auth('Sign-in successful', { email: userInfo.email, name: userInfo.name });
                 chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                     updateAuthUI(userInfo);
+                    showAuthenticatedInterface();
                     await createOrUpdateUser(userInfo);
                 });
+            } else {
+                Logger.error('Failed to get user info after sign-in');
             }
+        } else {
+            Logger.error('No token received during sign-in');
         }
     });
 }
 
 async function signOutFromGoogle() {
-    chrome.storage.local.get(['authToken'], (result) => {
-        if (result.authToken) {
-            chrome.identity.removeCachedAuthToken({ token: result.authToken }, () => {
-                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    document.getElementById('userProfile').style.display = 'none';
-                    document.getElementById('signInBtn').style.display = 'block';
-                    currentUserId = null;
+    Logger.auth('Starting sign-out process');
+
+    chrome.storage.local.get(['authToken'], async (result) => {
+        const token = result.authToken;
+        const userId = currentUserId;
+
+        const completeSignOut = () => {
+            Logger.auth('Clearing all local state');
+
+            // Clear ALL local storage
+            chrome.storage.local.clear(() => {
+                Logger.auth('All local storage cleared');
+
+                // Reset in-memory state
+                cards = [];
+                tasks = [];
+                reminders = [];
+                currentUserId = null;
+
+                // Clear the canvas
+                const canvas = document.getElementById('canvas');
+                if (canvas) {
+                    canvas.innerHTML = '';
+                }
+
+                Logger.auth('Sign-out completed, showing login interface');
+                showLoginInterface();
+            });
+        };
+
+        // Call backend logout endpoint to clear server-side session data
+        if (userId) {
+            try {
+                Logger.auth('Logging out from backend', { userId });
+                await fetch(`${API_URL}/api/logout/${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                Logger.auth('Backend logout successful');
+            } catch (error) {
+                Logger.warn('Backend logout failed', error);
+            }
+        }
+
+        if (token) {
+            Logger.auth('Revoking Google OAuth token');
+
+            // Revoke the token with Google to force account picker on next sign-in
+            fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            })
+            .then(() => {
+                Logger.auth('Token revoked with Google');
+            })
+            .catch((error) => {
+                Logger.warn('Failed to revoke token with Google', error);
+            })
+            .finally(() => {
+                // Remove cached token from Chrome
+                chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                    Logger.auth('Cached token removed from Chrome');
+
+                    // Also clear all Chrome Identity tokens to force fresh login
+                    chrome.identity.clearAllCachedAuthTokens(() => {
+                        Logger.auth('All cached auth tokens cleared');
+                        completeSignOut();
+                    });
                 });
             });
+        } else {
+            Logger.auth('No auth token found during sign-out');
+            completeSignOut();
         }
     });
 }
 
 async function getUserInfo(token) {
     try {
+        Logger.api('Fetching user info from Google API');
         const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -2075,23 +2425,29 @@ async function getUserInfo(token) {
         });
         
         if (response.ok) {
-            return await response.json();
+            const userInfo = await response.json();
+            Logger.api('User info retrieved successfully', { email: userInfo.email });
+            return userInfo;
         }
         
         if (response.status === 401) {
+            Logger.warn('Token unauthorized, removing cached token');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                console.log('Removed invalid cached token');
+                Logger.debug('Removed invalid cached token');
             });
         }
         
+        Logger.error('Failed to fetch user info', { status: response.status });
         return null;
     } catch (error) {
-        console.error('Error fetching user info:', error);
+        Logger.error('Error fetching user info', error);
         return null;
     }
 }
 
 function updateAuthUI(userInfo) {
+    Logger.debug('Updating authentication UI', { name: userInfo.name, email: userInfo.email });
+    
     document.getElementById('signInBtn').style.display = 'none';
     document.getElementById('userProfile').style.display = 'flex';
     document.getElementById('userName').textContent = userInfo.name || userInfo.email;
