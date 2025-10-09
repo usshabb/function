@@ -1,7 +1,7 @@
 {
-  "name": "function-backend",
+  "name": "canvas-tab-backend",
   "version": "1.0.0",
-  "description": "Node.js backend for Function Chrome extension",
+  "description": "Node.js backend for Canvas Tab Chrome extension",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

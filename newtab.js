@@ -5,7 +5,9 @@ let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
 
-const API_URL = 'http://localhost:3000';
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : `https://${window.location.hostname.replace(/^.*?\.replit\.dev$/, match => match.replace(/^.*?-/, ''))}/api`.replace('/api', ':3000');
 
 let syncTimeout = null;
 let currentUserId = null;
@@ -1737,7 +1739,13 @@ async function renderHistoryCard(cardEl, cardId) {
     content.appendChild(list);
 }
 
-const DEFAULT_RSS_FEEDS = [];
+const DEFAULT_RSS_FEEDS = [
+    { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+    { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml' },
+    { name: 'Hacker News', url: 'https://news.ycombinator.com/rss' },
+    { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
+    { name: 'Wired', url: 'https://www.wired.com/feed/rss' }
+];
 
 async function fetchRssFeed(feedUrl) {
     const CORS_PROXY = 'https://api.cors.lol/?url=';
@@ -1794,8 +1802,7 @@ async function renderRssCard(cardEl, cardId) {
         articles.forEach(article => {
             allArticles.push({
                 ...article,
-                source: feed.name,
-                favicon: feed.favicon
+                source: feed.name
             });
         });
     }
@@ -1806,144 +1813,109 @@ async function renderRssCard(cardEl, cardId) {
         return dateB - dateA;
     });
     
+    const latestArticles = allArticles.slice(0, 5);
+    
     content.innerHTML = '';
     
     const header = document.createElement('div');
     header.className = 'rss-header';
     
     const title = document.createElement('h3');
-    title.textContent = 'Latest Articles';
+    title.textContent = 'Latest Tech News';
     title.style.margin = '0 0 10px 0';
     title.style.fontSize = '16px';
     title.style.fontWeight = '600';
     
-    const exploreBtn = document.createElement('button');
-    exploreBtn.className = 'rss-manage-btn';
-    exploreBtn.textContent = 'Explore Feeds';
-    exploreBtn.addEventListener('click', () => showFeedExplorer(cardEl, cardId));
+    const manageBtn = document.createElement('button');
+    manageBtn.className = 'rss-manage-btn';
+    manageBtn.textContent = 'Manage Feeds';
+    manageBtn.addEventListener('click', () => showFeedManager(cardEl, cardId));
     
     header.appendChild(title);
-    header.appendChild(exploreBtn);
+    header.appendChild(manageBtn);
     content.appendChild(header);
     
-    if (allArticles.length === 0) {
-        const emptyState = document.createElement('div');
-        emptyState.className = 'rss-empty-state';
-        emptyState.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: #888;">
-                <div style="font-size: 24px; margin-bottom: 12px;">📰</div>
-                <div style="font-weight: 500; margin-bottom: 8px;">No feeds yet</div>
-                <div style="font-size: 14px;">Click "Explore Feeds" to discover sources</div>
-            </div>
-        `;
-        content.appendChild(emptyState);
+    if (latestArticles.length === 0) {
+        const noArticles = document.createElement('div');
+        noArticles.style.textAlign = 'center';
+        noArticles.style.padding = '20px';
+        noArticles.style.color = '#888';
+        noArticles.textContent = 'No articles found';
+        content.appendChild(noArticles);
         return;
     }
     
     const articleList = document.createElement('div');
     articleList.className = 'rss-article-list';
     
-    const groupedArticles = groupArticlesByDate(allArticles);
-    
-    Object.keys(groupedArticles).forEach(dateGroup => {
-        if (groupedArticles[dateGroup].length === 0) return;
+    latestArticles.forEach(article => {
+        const articleEl = document.createElement('a');
+        articleEl.className = 'rss-article';
+        articleEl.href = article.link;
+        articleEl.target = '_blank';
         
-        const groupHeader = document.createElement('div');
-        groupHeader.className = 'rss-date-group';
-        groupHeader.textContent = dateGroup;
-        articleList.appendChild(groupHeader);
+        const articleTitle = document.createElement('div');
+        articleTitle.className = 'rss-article-title';
+        articleTitle.textContent = article.title;
         
-        groupedArticles[dateGroup].forEach(article => {
-            const articleEl = document.createElement('a');
-            articleEl.className = 'rss-article';
-            articleEl.href = article.link;
-            articleEl.target = '_blank';
+        const articleMeta = document.createElement('div');
+        articleMeta.className = 'rss-article-meta';
+        
+        const source = document.createElement('span');
+        source.textContent = article.source;
+        
+        const date = document.createElement('span');
+        if (article.pubDate) {
+            const pubDate = new Date(article.pubDate);
+            const now = new Date();
+            const diffTime = Math.abs(now - pubDate);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
             
-            const articleTitle = document.createElement('div');
-            articleTitle.className = 'rss-article-title';
-            articleTitle.textContent = article.title;
-            
-            const articleMeta = document.createElement('div');
-            articleMeta.className = 'rss-article-meta';
-            
-            if (article.favicon) {
-                const favicon = document.createElement('img');
-                favicon.src = article.favicon;
-                favicon.className = 'rss-article-favicon';
-                favicon.onerror = () => favicon.style.display = 'none';
-                articleMeta.appendChild(favicon);
+            if (diffDays === 0) {
+                if (diffHours === 0) {
+                    date.textContent = 'Just now';
+                } else if (diffHours === 1) {
+                    date.textContent = '1 hour ago';
+                } else {
+                    date.textContent = `${diffHours} hours ago`;
+                }
+            } else if (diffDays === 1) {
+                date.textContent = 'Yesterday';
+            } else if (diffDays < 7) {
+                date.textContent = `${diffDays} days ago`;
+            } else {
+                date.textContent = pubDate.toLocaleDateString();
             }
-            
-            const source = document.createElement('span');
-            source.textContent = article.source;
-            articleMeta.appendChild(source);
-            
-            articleEl.appendChild(articleTitle);
-            articleEl.appendChild(articleMeta);
-            articleList.appendChild(articleEl);
-        });
+        }
+        
+        articleMeta.appendChild(source);
+        if (article.pubDate) {
+            const separator = document.createElement('span');
+            separator.textContent = ' • ';
+            articleMeta.appendChild(separator);
+            articleMeta.appendChild(date);
+        }
+        
+        articleEl.appendChild(articleTitle);
+        articleEl.appendChild(articleMeta);
+        articleList.appendChild(articleEl);
     });
     
     content.appendChild(articleList);
 }
 
-function groupArticlesByDate(articles) {
-    const groups = {
-        'Today': [],
-        'Yesterday': [],
-        'This Week': [],
-        'Earlier': []
-    };
-    
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    
-    articles.forEach(article => {
-        if (!article.pubDate) {
-            groups['Earlier'].push(article);
-            return;
-        }
-        
-        const pubDate = new Date(article.pubDate);
-        const articleDate = new Date(pubDate.getFullYear(), pubDate.getMonth(), pubDate.getDate());
-        
-        if (articleDate.getTime() === today.getTime()) {
-            groups['Today'].push(article);
-        } else if (articleDate.getTime() === yesterday.getTime()) {
-            groups['Yesterday'].push(article);
-        } else if (articleDate >= weekAgo) {
-            groups['This Week'].push(article);
-        } else {
-            groups['Earlier'].push(article);
-        }
-    });
-    
-    return groups;
-}
-
-async function showFeedExplorer(cardEl, cardId) {
+function showFeedManager(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
-    content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Loading sources...</div>';
     
-    try {
-        const subscribedFeeds = await loadRssFeeds(cardId);
-        const subscribedUrls = new Set(subscribedFeeds.map(f => f.url));
-        
-        const response = await fetch(`${API_URL}/api/rss-sources`);
-        const data = await response.json();
-        const groupedSources = data.sources;
-        
+    loadRssFeeds(cardId).then(feeds => {
         content.innerHTML = '';
         
         const header = document.createElement('div');
         header.className = 'rss-header';
         
         const title = document.createElement('h3');
-        title.textContent = 'Explore Feeds';
+        title.textContent = 'Manage RSS Feeds';
         title.style.margin = '0 0 10px 0';
         title.style.fontSize = '16px';
         title.style.fontWeight = '600';
@@ -1957,76 +1929,81 @@ async function showFeedExplorer(cardEl, cardId) {
         header.appendChild(backBtn);
         content.appendChild(header);
         
-        const feedExplorer = document.createElement('div');
-        feedExplorer.className = 'rss-explorer';
+        const feedList = document.createElement('div');
+        feedList.className = 'rss-feed-list';
         
-        Object.keys(groupedSources).sort().forEach(category => {
-            const categorySection = document.createElement('div');
-            categorySection.className = 'rss-category-section';
+        feeds.forEach((feed, index) => {
+            const feedItem = document.createElement('div');
+            feedItem.className = 'rss-feed-item';
             
-            const categoryHeader = document.createElement('div');
-            categoryHeader.className = 'rss-category-header';
-            categoryHeader.textContent = category;
-            categorySection.appendChild(categoryHeader);
+            const feedInfo = document.createElement('div');
+            feedInfo.className = 'rss-feed-info';
             
-            groupedSources[category].forEach(source => {
-                const feedItem = document.createElement('div');
-                feedItem.className = 'rss-feed-item';
-                
-                const feedInfo = document.createElement('div');
-                feedInfo.className = 'rss-feed-info';
-                
-                if (source.favicon) {
-                    const favicon = document.createElement('img');
-                    favicon.src = source.favicon;
-                    favicon.className = 'rss-feed-favicon';
-                    favicon.onerror = () => favicon.style.display = 'none';
-                    feedInfo.appendChild(favicon);
-                }
-                
-                const feedName = document.createElement('div');
-                feedName.className = 'rss-feed-name';
-                feedName.textContent = source.name;
-                feedInfo.appendChild(feedName);
-                
-                const isSubscribed = subscribedUrls.has(source.url);
-                
-                const toggleBtn = document.createElement('button');
-                toggleBtn.className = `rss-toggle-btn ${isSubscribed ? 'subscribed' : ''}`;
-                toggleBtn.innerHTML = isSubscribed ? '✓' : '+';
-                toggleBtn.addEventListener('click', async () => {
-                    if (isSubscribed) {
-                        const index = subscribedFeeds.findIndex(f => f.url === source.url);
-                        if (index > -1) {
-                            subscribedFeeds.splice(index, 1);
-                            subscribedUrls.delete(source.url);
-                        }
-                    } else {
-                        subscribedFeeds.push({
-                            name: source.name,
-                            url: source.url,
-                            favicon: source.favicon
-                        });
-                        subscribedUrls.add(source.url);
-                    }
-                    
-                    await saveRssFeeds(cardId, subscribedFeeds);
-                    showFeedExplorer(cardEl, cardId);
-                });
-                
-                feedItem.appendChild(feedInfo);
-                feedItem.appendChild(toggleBtn);
-                categorySection.appendChild(feedItem);
+            const feedName = document.createElement('div');
+            feedName.className = 'rss-feed-name';
+            feedName.textContent = feed.name;
+            
+            const feedUrl = document.createElement('div');
+            feedUrl.className = 'rss-feed-url';
+            feedUrl.textContent = feed.url;
+            
+            feedInfo.appendChild(feedName);
+            feedInfo.appendChild(feedUrl);
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'rss-remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', async () => {
+                feeds.splice(index, 1);
+                await saveRssFeeds(cardId, feeds);
+                showFeedManager(cardEl, cardId);
             });
             
-            feedExplorer.appendChild(categorySection);
+            feedItem.appendChild(feedInfo);
+            feedItem.appendChild(removeBtn);
+            feedList.appendChild(feedItem);
         });
         
-        content.appendChild(feedExplorer);
-    } catch (error) {
-        console.error('Feed explorer error:', error);
-        content.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Failed to load feeds</div>';
-    }
+        content.appendChild(feedList);
+        
+        const addSection = document.createElement('div');
+        addSection.className = 'rss-add-section';
+        
+        const addTitle = document.createElement('div');
+        addTitle.textContent = 'Add New Feed';
+        addTitle.style.fontSize = '14px';
+        addTitle.style.fontWeight = '600';
+        addTitle.style.marginBottom = '8px';
+        
+        const nameInput = document.createElement('input');
+        nameInput.className = 'rss-input';
+        nameInput.placeholder = 'Feed name (e.g., TechCrunch)';
+        
+        const urlInput = document.createElement('input');
+        urlInput.className = 'rss-input';
+        urlInput.placeholder = 'RSS feed URL';
+        
+        const addBtn = document.createElement('button');
+        addBtn.className = 'rss-add-btn';
+        addBtn.textContent = 'Add Feed';
+        addBtn.addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            const url = urlInput.value.trim();
+            
+            if (name && url) {
+                feeds.push({ name, url });
+                await saveRssFeeds(cardId, feeds);
+                showFeedManager(cardEl, cardId);
+            }
+        });
+        
+        addSection.appendChild(addTitle);
+        addSection.appendChild(nameInput);
+        addSection.appendChild(urlInput);
+        addSection.appendChild(addBtn);
+        
+        content.appendChild(addSection);
+    });
 }
 
 async function checkAuthStatus() {

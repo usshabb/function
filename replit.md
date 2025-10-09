@@ -1,8 +1,8 @@
-# Function - Chrome Extension
+# Canvas Tab - Chrome Extension
 
 ## Overview
 
-Function is a browser extension that replaces the default new tab page with a personalized dashboard interface. Users can create and position draggable cards (notes, links, and app widgets) on an infinite canvas workspace. The extension provides a minimalist, clean interface for organizing information directly in the browser's new tab experience.
+Canvas Tab is a browser extension that replaces the default new tab page with a Notion-like canvas interface. Users can create and position draggable cards (notes, links, and app widgets) on an infinite canvas workspace. The extension provides a minimalist, clean interface for organizing information directly in the browser's new tab experience.
 
 **Available Apps:**
 - Mercury: Banking widget showing account balance and transactions
@@ -14,7 +14,7 @@ Function is a browser extension that replaces the default new tab page with a pe
 - SSENSE: Browse curated fashion products in a 3x5 grid with images, prices, and clickable links
 - Weather: Current weather for your location with temperature, conditions, and forecast
 - Top Sites: Ranked list of top 20 most visited websites from past 7 days with logos and visit counts. Users can star/pin favorite sites to keep them at the top while preserving original rank numbers for unstarred sites
-- RSS Reader: Explore and subscribe to 134 curated RSS sources across 12 categories (Design, Engineering, ML, Marketing, etc.). Features include favicon display, date-grouped articles (Today/Yesterday/This Week/Earlier), one-click subscription toggles, and no auto-subscriptions (users explore and choose their feeds)
+- RSS Reader: Follow tech blogs and news sources with latest 5 articles displayed. Starts with 5 default feeds (TechCrunch, The Verge, Hacker News, Ars Technica, Wired). Users can add/remove custom RSS feeds via the Manage Feeds interface
 
 ## User Preferences
 
@@ -22,24 +22,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates
 
-**RSS Reader Redesign (October 2025)**
-- Migrated to MongoDB backend with RSSSource collection containing 134 curated sources
-- "Explore Feeds" replaces "Manage Feed" - no auto-subscriptions, users discover sources
-- Favicon display for both articles and feed sources
-- One-click subscription toggles with + and ✓ indicators
-- Date-grouped articles: Today, Yesterday, This Week, Earlier sections
-- 12 categories: Design, Engineering, ML, Marketing, Neuroscience, Products, Psychology, Science, Startup, Tech News, Thinking
-
-**Backend Migration to MongoDB + Node.js (October 2025)**
-- Complete migration from PostgreSQL + Python Flask to MongoDB Atlas + Node.js Express
-- Maintained all cloud sync functionality with improved performance
-- CORS properly configured for Chrome extension origins
-- Encryption using Node.js crypto module (AES-256) for sensitive tokens
-- Backend API endpoints: /api/user, /api/state, /api/tokens, /api/rss-sources
-
-**Cloud Sync with Database Backend (Added October 2025)**
+**Cloud Sync with PostgreSQL Backend (Added October 2025)**
 - Complete state synchronization across browsers and devices
-- MongoDB Atlas database backend hosted on cloud
+- PostgreSQL database backend hosted on Replit
 - Auto-save with 2-3 second debounce for optimal performance
 - Encrypted storage for sensitive API tokens (Mercury, etc.)
 - Visual sync status indicator in toolbar (saving/saved/error states)

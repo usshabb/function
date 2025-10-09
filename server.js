@@ -5,35 +5,6 @@ require('dotenv').config();
 
 const app = express();
 
-// Logging utility for server
-const Logger = {
-    isDev: process.env.NODE_ENV !== 'production',
-    
-    debug: function(message, data = null) {
-        if (this.isDev) {
-            console.log(`[DEBUG] ${new Date().toISOString()}: ${message}`, data ? JSON.stringify(data, null, 2) : '');
-        }
-    },
-    
-    info: function(message, data = null) {
-        console.info(`[INFO] ${new Date().toISOString()}: ${message}`, data ? JSON.stringify(data, null, 2) : '');
-    },
-    
-    warn: function(message, data = null) {
-        console.warn(`[WARN] ${new Date().toISOString()}: ${message}`, data ? JSON.stringify(data, null, 2) : '');
-    },
-    
-    error: function(message, error = null) {
-        console.error(`[ERROR] ${new Date().toISOString()}: ${message}`, error ? error.stack || error : '');
-    },
-    
-    api: function(method, path, message = '', data = null) {
-        if (this.isDev) {
-            console.log(`[API] ${new Date().toISOString()}: ${method} ${path} - ${message}`, data ? JSON.stringify(data, null, 2) : '');
-        }
-    }
-};
-
 // CORS configuration
 app.use(cors({
     origin: '*',
@@ -48,12 +19,8 @@ app.use(express.json());
 const MONGODB_URI = process.env.MONGODB_URI;
 
 mongoose.connect(MONGODB_URI)
-    .then(() => {
-        Logger.info('Connected to MongoDB successfully');
-        console.log('✓ Connected to MongoDB');
-    })
+    .then(() => console.log('✓ Connected to MongoDB'))
     .catch(err => {
-        Logger.error('MongoDB connection failed', err);
         console.error('MongoDB connection error:', err);
         process.exit(1);
     });
@@ -73,20 +40,16 @@ app.get('/health', (req, res) => {
 app.post('/api/user', async (req, res) => {
     try {
         const { user_id, email, name, picture } = req.body;
-        Logger.api('POST', '/api/user', 'Creating/updating user', { user_id, email, name });
         
         if (!user_id || !email) {
-            Logger.warn('User creation failed: missing required fields', { user_id, email });
             return res.status(400).json({ error: 'user_id and email are required' });
         }
         
         let user = await User.findOne({ id: user_id });
         
         if (!user) {
-            Logger.debug('Creating new user', { user_id, email });
             user = new User({ id: user_id, email, name, picture });
         } else {
-            Logger.debug('Updating existing user', { user_id, email });
             user.email = email;
             user.name = name;
             user.picture = picture;
@@ -94,10 +57,8 @@ app.post('/api/user', async (req, res) => {
         }
         
         await user.save();
-        Logger.info('User created/updated successfully', { user_id, email });
         res.json({ message: 'User created/updated successfully' });
     } catch (error) {
-        Logger.error('User creation error', error);
         console.error('User creation error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -106,20 +67,14 @@ app.post('/api/user', async (req, res) => {
 // State routes
 app.get('/api/state/:user_id', async (req, res) => {
     try {
-        const userId = req.params.user_id;
-        Logger.api('GET', `/api/state/${userId}`, 'Loading user state');
-        
-        const state = await UserState.findOne({ user_id: userId });
+        const state = await UserState.findOne({ user_id: req.params.user_id });
         
         if (!state) {
-            Logger.debug('No state found for user', { userId });
             return res.json({ state: {} });
         }
         
-        Logger.debug('State loaded successfully', { userId, hasData: !!state.state_data });
         res.json({ state: state.state_data });
     } catch (error) {
-        Logger.error('Get state error', error);
         console.error('Get state error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -128,34 +83,22 @@ app.get('/api/state/:user_id', async (req, res) => {
 app.post('/api/state/:user_id', async (req, res) => {
     try {
         const { state } = req.body;
-        const userId = req.params.user_id;
         
-        Logger.api('POST', `/api/state/${userId}`, 'Saving user state', {
-            userId,
-            cardCount: state?.cards?.length || 0,
-            taskCount: state?.tasks?.length || 0,
-            reminderCount: state?.reminders?.length || 0
-        });
-        
-        let userState = await UserState.findOne({ user_id: userId });
+        let userState = await UserState.findOne({ user_id: req.params.user_id });
         
         if (!userState) {
-            Logger.debug('Creating new state record', { userId });
             userState = new UserState({
-                user_id: userId,
+                user_id: req.params.user_id,
                 state_data: state || {}
             });
         } else {
-            Logger.debug('Updating existing state record', { userId });
             userState.state_data = state || {};
             userState.updated_at = new Date();
         }
         
         await userState.save();
-        Logger.info('State saved successfully', { userId });
         res.json({ message: 'State saved successfully' });
     } catch (error) {
-        Logger.error('Save state error', error);
         console.error('Save state error:', error);
         res.status(500).json({ error: error.message });
     }
@@ -217,14 +160,13 @@ app.delete('/api/tokens/:user_id/:token_type', async (req, res) => {
             user_id: req.params.user_id,
             token_type: req.params.token_type
         });
-
+        
         res.json({ message: 'Token deleted successfully' });
     } catch (error) {
         console.error('Delete token error:', error);
         res.status(500).json({ error: error.message });
     }
 });
-
 
 // RSS Source routes
 app.get('/api/rss-sources', async (req, res) => {
@@ -266,32 +208,7 @@ app.get('/api/rss-sources/categories', async (req, res) => {
     }
 });
 
-// Logout route - clears user session data
-app.post('/api/logout/:user_id', async (req, res) => {
-    try {
-        const userId = req.params.user_id;
-        Logger.api('POST', `/api/logout/${userId}`, 'Processing logout');
-
-        // Delete all tokens for this user
-        await UserToken.deleteMany({ user_id: userId });
-        Logger.debug('All tokens deleted for user', { userId });
-
-        // Optionally: Clear user state (uncomment if you want to delete state on logout)
-        // await UserState.deleteOne({ user_id: userId });
-        // Logger.debug('User state cleared', { userId });
-
-        Logger.info('Logout completed successfully', { userId });
-        res.json({ message: 'Logout successful' });
-    } catch (error) {
-        Logger.error('Logout error', error);
-        console.error('Logout error:', error);
-
-        res.status(500).json({ error: error.message });
-    }
-});
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    Logger.info(`Server started successfully on port ${PORT}`);
     console.log(`✓ Server running on port ${PORT}`);
 });
