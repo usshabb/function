@@ -13,6 +13,9 @@ let syncTimeout = null;
 let currentUserId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Show unauthenticated view immediately
+    updateUnauthenticatedUI();
+    
     loadCards();
     loadTasks();
     loadReminders();
@@ -25,6 +28,34 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('closeModal').addEventListener('click', closeAppModal);
     document.getElementById('signInBtn').addEventListener('click', signInWithGoogle);
     document.getElementById('signOutBtn').addEventListener('click', signOutFromGoogle);
+    
+    const unauthSignInBtn = document.getElementById('unauthSignInBtn');
+    if (unauthSignInBtn) {
+        unauthSignInBtn.addEventListener('click', signInWithGoogle);
+    }
+    
+    const unauthSearchInput = document.getElementById('unauthSearchInput');
+    const unauthModelBtn = document.getElementById('unauthModelBtn');
+    
+    if (unauthSearchInput) {
+        unauthSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                // Handle search when authenticated
+                const query = unauthSearchInput.value.trim();
+                if (query && currentUserId) {
+                    // Future: handle search functionality
+                    console.log('Search query:', query);
+                }
+            }
+        });
+    }
+    
+    if (unauthModelBtn) {
+        unauthModelBtn.addEventListener('click', () => {
+            // Future: show AI model selector dropdown
+            console.log('AI model selector clicked');
+        });
+    }
     
     document.querySelectorAll('.app-option').forEach(option => {
         option.addEventListener('click', (e) => {
@@ -2072,11 +2103,35 @@ function showFeedManager(cardEl, cardId) {
 }
 
 async function checkAuthStatus() {
+    // Check if we're in Microsoft Edge
+    if (isMicrosoftEdge()) {
+        // For Edge, check if we have a stored token
+        chrome.storage.local.get(['userInfo', 'authToken'], async (result) => {
+            if (result.userInfo && result.authToken) {
+                // Verify token is still valid
+                const userInfo = await getUserInfo(result.authToken);
+                if (userInfo) {
+                    showAuthenticatedView(userInfo);
+                    updateAuthUI(userInfo);
+                    currentUserId = userInfo.id;
+                } else {
+                    chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                        showUnauthenticatedView();
+                        currentUserId = null;
+                    });
+                }
+            } else {
+                showUnauthenticatedView();
+                currentUserId = null;
+            }
+        });
+        return;
+    }
+    
     chrome.identity.getAuthToken({ interactive: false }, async (token) => {
         if (chrome.runtime.lastError || !token) {
             chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                document.getElementById('signInBtn').style.display = 'block';
-                document.getElementById('userProfile').style.display = 'none';
+                showUnauthenticatedView();
                 currentUserId = null;
             });
             return;
@@ -2085,14 +2140,14 @@ async function checkAuthStatus() {
         const userInfo = await getUserInfo(token);
         if (userInfo) {
             chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
+                showAuthenticatedView(userInfo);
                 updateAuthUI(userInfo);
                 await createOrUpdateUser(userInfo);
             });
         } else {
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    document.getElementById('signInBtn').style.display = 'block';
-                    document.getElementById('userProfile').style.display = 'none';
+                    showUnauthenticatedView();
                     currentUserId = null;
                 });
             });
@@ -2100,7 +2155,174 @@ async function checkAuthStatus() {
     });
 }
 
+function showUnauthenticatedView() {
+    document.getElementById('unauthenticatedView').style.display = 'flex';
+    document.querySelector('.toolbar').style.display = 'none';
+    document.getElementById('canvas').style.display = 'none';
+    document.body.classList.add('unauth-mode');
+    const signinSection = document.querySelector('.unauth-signin-section');
+    if (signinSection) {
+        signinSection.style.display = 'flex';
+    }
+    const dotsSection = document.querySelector('.unauth-dots');
+    if (dotsSection) {
+        dotsSection.style.display = 'flex';
+    }
+    const bottomQuote = document.querySelector('.unauth-bottom-quote');
+    if (bottomQuote) {
+        bottomQuote.style.display = 'block';
+    }
+    updateUnauthenticatedUI();
+}
+
+function hideUnauthenticatedView() {
+    document.getElementById('unauthenticatedView').style.display = 'none';
+    document.querySelector('.toolbar').style.display = 'flex';
+    document.getElementById('canvas').style.display = 'block';
+    document.body.classList.remove('unauth-mode');
+    document.getElementById('signInBtn').style.display = 'block';
+    document.getElementById('userProfile').style.display = 'none';
+}
+
+function showAuthenticatedView(userInfo) {
+    document.getElementById('unauthenticatedView').style.display = 'none';
+    document.querySelector('.toolbar').style.display = 'flex';
+    document.getElementById('canvas').style.display = 'block';
+    document.body.classList.remove('unauth-mode');
+    updateAuthUI(userInfo);
+}
+
+function updateUnauthenticatedUI(userInfo = null) {
+    const greetingEl = document.getElementById('unauthGreeting');
+    const dateWeatherEl = document.getElementById('unauthDateWeather');
+    
+    const now = new Date();
+    const hour = now.getHours();
+    let greeting = 'Good morning';
+    
+    if (hour >= 12 && hour < 17) {
+        greeting = 'Good afternoon';
+    } else if (hour >= 17) {
+        greeting = 'Good evening';
+    }
+    
+    // If authenticated, add first name to greeting
+    if (userInfo && userInfo.name) {
+        const firstName = userInfo.name.split(' ')[0];
+        greeting += `, ${firstName}`;
+    }
+    
+    greetingEl.textContent = greeting;
+    
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayName = days[now.getDay()];
+    const monthName = months[now.getMonth()];
+    const day = now.getDate();
+    const dateStr = `${dayName}, ${monthName} ${day}${getOrdinalSuffix(day)}`;
+    
+    dateWeatherEl.textContent = `${dateStr} • Loading weather...`;
+    
+    fetchWeatherForUnauth(dateWeatherEl);
+}
+
+function getOrdinalSuffix(day) {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+}
+
+async function fetchWeatherForUnauth(element) {
+    if (!navigator.geolocation) {
+        element.textContent = element.textContent.replace('Loading weather...', 'Weather unavailable');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const { latitude, longitude } = position.coords;
+            const weatherData = await fetchWeatherData(latitude, longitude);
+            
+            if (weatherData) {
+                const current = weatherData.current_weather;
+                const tempF = Math.round((current.temperature * 9/5) + 32);
+                const weatherDesc = getWeatherDescription(current.weathercode);
+                const descText = weatherDesc.split(' ').slice(1).join(' ').toLowerCase();
+                
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const now = new Date();
+                const dayName = days[now.getDay()];
+                const monthName = months[now.getMonth()];
+                const day = now.getDate();
+                const dateStr = `${dayName}, ${monthName} ${day}${getOrdinalSuffix(day)}`;
+                
+                element.textContent = `${dateStr} • ${tempF} F° and ${descText}`;
+            } else {
+                element.textContent = element.textContent.replace('Loading weather...', 'Weather unavailable');
+            }
+        },
+        () => {
+            element.textContent = element.textContent.replace('Loading weather...', 'Weather unavailable');
+        }
+    );
+}
+
+// Check if running in Microsoft Edge
+function isMicrosoftEdge() {
+    return navigator.userAgent.indexOf('Edg') !== -1;
+}
+
 async function signInWithGoogle() {
+    // Check if we're in Microsoft Edge
+    if (isMicrosoftEdge()) {
+        // Use alternative OAuth flow for Edge
+        const clientId = chrome.runtime.getManifest().oauth2.client_id;
+        const redirectUri = chrome.identity.getRedirectURL();
+        const scopes = chrome.runtime.getManifest().oauth2.scopes.join(' ');
+        
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+            `client_id=${clientId}&` +
+            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+            `response_type=token&` +
+            `scope=${encodeURIComponent(scopes)}`;
+        
+        // Launch OAuth flow
+        chrome.identity.launchWebAuthFlow({
+            url: authUrl,
+            interactive: true
+        }, async (responseUrl) => {
+            if (chrome.runtime.lastError) {
+                console.error('Auth error:', chrome.runtime.lastError);
+                alert('Authentication failed. Please try again.');
+                return;
+            }
+            
+            if (responseUrl) {
+                // Extract access token from response URL
+                const urlParams = new URLSearchParams(responseUrl.split('#')[1]);
+                const token = urlParams.get('access_token');
+                
+                if (token) {
+                    const userInfo = await getUserInfo(token);
+                    if (userInfo) {
+                        chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
+                            showAuthenticatedView(userInfo);
+                            updateAuthUI(userInfo);
+                            await createOrUpdateUser(userInfo);
+                        });
+                    }
+                }
+            }
+        });
+        return;
+    }
+    
+    // Standard Chrome OAuth flow
     chrome.identity.getAuthToken({ interactive: true }, async (token) => {
         if (chrome.runtime.lastError) {
             console.error('Auth error:', chrome.runtime.lastError);
@@ -2111,6 +2333,7 @@ async function signInWithGoogle() {
             const userInfo = await getUserInfo(token);
             if (userInfo) {
                 chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
+                    showAuthenticatedView(userInfo);
                     updateAuthUI(userInfo);
                     await createOrUpdateUser(userInfo);
                 });
@@ -2122,12 +2345,25 @@ async function signInWithGoogle() {
 async function signOutFromGoogle() {
     chrome.storage.local.get(['authToken'], (result) => {
         if (result.authToken) {
-            chrome.identity.removeCachedAuthToken({ token: result.authToken }, () => {
+            // Only try to remove cached token if not in Edge
+            if (!isMicrosoftEdge()) {
+                chrome.identity.removeCachedAuthToken({ token: result.authToken }, () => {
+                    chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                        showUnauthenticatedView();
+                        currentUserId = null;
+                    });
+                });
+            } else {
+                // For Edge, just remove from storage
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    document.getElementById('userProfile').style.display = 'none';
-                    document.getElementById('signInBtn').style.display = 'block';
+                    showUnauthenticatedView();
                     currentUserId = null;
                 });
+            }
+        } else {
+            chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                showUnauthenticatedView();
+                currentUserId = null;
             });
         }
     });
@@ -2146,9 +2382,15 @@ async function getUserInfo(token) {
         }
         
         if (response.status === 401) {
-            chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                console.log('Removed invalid cached token');
-            });
+            // Only try to remove cached token if not in Edge
+            if (!isMicrosoftEdge()) {
+                chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                    console.log('Removed invalid cached token');
+                });
+            } else {
+                // For Edge, just log the error
+                console.log('Invalid token detected');
+            }
         }
         
         return null;
