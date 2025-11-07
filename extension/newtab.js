@@ -5,21 +5,37 @@ let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
 
-const API_URL = window.location.hostname === 'localhost' 
+// Detect if we're in a Chrome extension (hostname will be extension ID, not localhost)
+function isChromeExtension() {
+    // Extension IDs are long alphanumeric strings (32 chars)
+    // Also check if chrome.runtime exists
+    return window.location.hostname.length > 20 && /^[a-z]+$/.test(window.location.hostname) || 
+           (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id);
+}
+
+// Set API URL - always use localhost for Chrome extensions
+const API_URL = (window.location.hostname === 'localhost' || isChromeExtension())
     ? 'http://localhost:3000' 
     : `https://${window.location.hostname.replace(/^.*?\.replit\.dev$/, match => match.replace(/^.*?-/, ''))}/api`.replace('/api', ':3000');
+
+console.log('🌐 API_URL set to:', API_URL);
+console.log('🌐 Current hostname:', window.location.hostname);
+console.log('🌐 Is Chrome Extension:', isChromeExtension());
 
 let syncTimeout = null;
 let currentUserId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Show unauthenticated view immediately
-    updateUnauthenticatedUI();
+    // Show loading state first to prevent blinking
+    showLoadingState();
     
+    // Load data in background
     loadCards();
     loadTasks();
     loadReminders();
     startReminderChecker();
+    
+    // Check auth status - will hide loading and show appropriate view
     checkAuthStatus();
     
     document.getElementById('addNote').addEventListener('click', () => createCard('note'));
@@ -40,9 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (unauthSearchInput) {
         unauthSearchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                // Handle search when authenticated
+                // Handle search
                 const query = unauthSearchInput.value.trim();
-                if (query && currentUserId) {
+                if (query) {
                     // Future: handle search functionality
                     console.log('Search query:', query);
                 }
@@ -52,6 +68,30 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (unauthModelBtn) {
         unauthModelBtn.addEventListener('click', () => {
+            // Future: show AI model selector dropdown
+            console.log('AI model selector clicked');
+        });
+    }
+    
+    // Authenticated search input and model button
+    const authSearchInput = document.getElementById('authSearchInput');
+    const authModelBtn = document.getElementById('authModelBtn');
+    
+    if (authSearchInput) {
+        authSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                // Handle search when authenticated
+                const query = authSearchInput.value.trim();
+                if (query && currentUserId) {
+                    // Future: handle search functionality
+                    console.log('Search query:', query);
+                }
+            }
+        });
+    }
+    
+    if (authModelBtn) {
+        authModelBtn.addEventListener('click', () => {
             // Future: show AI model selector dropdown
             console.log('AI model selector clicked');
         });
@@ -379,8 +419,12 @@ function loadCards() {
 }
 
 function debouncedSync() {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+        console.warn('⚠️ debouncedSync called but currentUserId is null/undefined');
+        return;
+    }
     
+    console.log('⏱️ Debouncing sync (will sync in 2 seconds)...');
     if (syncTimeout) {
         clearTimeout(syncTimeout);
     }
@@ -391,9 +435,13 @@ function debouncedSync() {
 }
 
 async function syncStateToBackend() {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+        console.error('❌ Cannot sync: currentUserId is null/undefined');
+        return;
+    }
     
     try {
+        console.log('🔄 Starting sync to backend for user:', currentUserId);
         showSyncStatus('saving');
         
         const state = {
@@ -404,6 +452,15 @@ async function syncStateToBackend() {
             rssFeeds: await getAllRssFeeds()
         };
         
+        console.log('📤 Sending state to:', `${API_URL}/api/state/${currentUserId}`);
+        console.log('📊 State data:', {
+            cards: cards.length,
+            tasks: tasks.length,
+            reminders: reminders.length,
+            starredSites: state.starredSites?.length || 0,
+            rssFeeds: Object.keys(state.rssFeeds || {}).length
+        });
+        
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`, {
             method: 'POST',
             headers: {
@@ -412,13 +469,18 @@ async function syncStateToBackend() {
             body: JSON.stringify({ state })
         });
         
+        const responseData = await response.json();
+        console.log('📥 Server response:', response.status, responseData);
+        
         if (response.ok) {
+            console.log('✅ Sync successful');
             showSyncStatus('saved');
         } else {
+            console.error('❌ Sync failed:', response.status, responseData);
             showSyncStatus('error');
         }
     } catch (error) {
-        console.error('Sync error:', error);
+        console.error('❌ Sync error:', error);
         showSyncStatus('error');
     }
 }
@@ -466,6 +528,9 @@ async function loadStateFromBackend() {
 
 async function createOrUpdateUser(userInfo) {
     try {
+        console.log('👤 Creating/updating user:', userInfo.id, userInfo.email);
+        console.log('📤 Sending to:', `${API_URL}/api/user`);
+        
         const response = await fetch(`${API_URL}/api/user`, {
             method: 'POST',
             headers: {
@@ -479,13 +544,27 @@ async function createOrUpdateUser(userInfo) {
             })
         });
         
+        const responseData = await response.json();
+        console.log('📥 User API response:', response.status, responseData);
+        
         if (response.ok) {
+            console.log('✅ User saved, setting currentUserId:', userInfo.id);
             currentUserId = userInfo.id;
+            console.log('✅ currentUserId is now:', currentUserId);
             await migrateLocalDataToBackend();
             await loadStateFromBackend();
+            // Test sync after a short delay to ensure everything is loaded
+            setTimeout(() => {
+                console.log('🧪 Testing sync after authentication...');
+                if (currentUserId) {
+                    syncStateToBackend();
+                }
+            }, 1000);
+        } else {
+            console.error('❌ User creation failed:', response.status, responseData);
         }
     } catch (error) {
-        console.error('User creation error:', error);
+        console.error('❌ User creation error:', error);
     }
 }
 
@@ -520,30 +599,44 @@ async function getAllRssFeeds() {
 }
 
 function showSyncStatus(status) {
+    const toolbar = document.querySelector('.toolbar');
+    if (!toolbar) {
+        console.warn('⚠️ Toolbar not found, cannot show sync status');
+        return;
+    }
+    
     let syncIndicator = document.getElementById('syncIndicator');
     if (!syncIndicator) {
         syncIndicator = document.createElement('div');
         syncIndicator.id = 'syncIndicator';
-        document.querySelector('.toolbar').appendChild(syncIndicator);
+        syncIndicator.style.cssText = 'margin-left: 10px; padding: 4px 8px; border-radius: 4px; font-size: 12px; transition: opacity 0.3s;';
+        toolbar.appendChild(syncIndicator);
     }
     
     syncIndicator.className = `sync-indicator ${status}`;
     
     if (status === 'saving') {
         syncIndicator.textContent = '↻ Saving...';
+        syncIndicator.style.color = '#666';
+        syncIndicator.style.backgroundColor = '#f0f0f0';
     } else if (status === 'saved') {
         syncIndicator.textContent = '✓ Saved';
+        syncIndicator.style.color = '#4caf50';
+        syncIndicator.style.backgroundColor = '#e8f5e9';
         setTimeout(() => {
             syncIndicator.style.opacity = '0';
         }, 2000);
     } else if (status === 'error') {
         syncIndicator.textContent = '✗ Sync error';
+        syncIndicator.style.color = '#f44336';
+        syncIndicator.style.backgroundColor = '#ffebee';
         setTimeout(() => {
             syncIndicator.style.opacity = '0';
         }, 3000);
     }
     
     syncIndicator.style.opacity = '1';
+    console.log(`📊 Sync status: ${status}`);
 }
 
 function openAppModal() {
@@ -835,25 +928,72 @@ function renderGoogleSearchCard(cardEl, cardId) {
 }
 
 function authenticateGmail() {
-    chrome.storage.local.get(['gmailConnected'], (result) => {
-        if (result.gmailConnected) {
+    chrome.storage.local.get(['gmailConnected', 'gmailToken'], (result) => {
+        if (result.gmailConnected && result.gmailToken) {
             createGmailCard();
-        } else {
-            if (typeof chrome.identity !== 'undefined') {
-                chrome.identity.getAuthToken({ interactive: true }, (token) => {
-                    if (chrome.runtime.lastError || !token) {
-                        alert('Failed to authenticate with Gmail. Please try again.');
-                        return;
-                    }
-                    
-                    chrome.storage.local.set({ gmailToken: token, gmailConnected: true }, () => {
-                        createGmailCard();
-                    });
+            return;
+        }
+        
+        if (typeof chrome.identity === 'undefined') {
+            alert('Gmail authentication requires a valid OAuth client ID. Please check the setup instructions.');
+            return;
+        }
+        
+        // Request Gmail scope separately using launchWebAuthFlow
+        const clientId = chrome.runtime.getManifest().oauth2.client_id;
+        const redirectUri = chrome.identity.getRedirectURL();
+        
+        // Include all scopes: base scopes + Gmail scope
+        const baseScopes = chrome.runtime.getManifest().oauth2.scopes;
+        const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly';
+        const allScopes = [...baseScopes, gmailScope].join(' ');
+        
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+            `client_id=${clientId}&` +
+            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+            `response_type=token&` +
+            `scope=${encodeURIComponent(allScopes)}`;
+        
+        chrome.identity.launchWebAuthFlow({
+            url: authUrl,
+            interactive: true
+        }, (responseUrl) => {
+            if (chrome.runtime.lastError) {
+                console.error('Gmail auth error:', chrome.runtime.lastError);
+                alert('Failed to authenticate with Gmail. Please try again.');
+                return;
+            }
+            
+            if (!responseUrl) {
+                alert('Failed to authenticate with Gmail. Please try again.');
+                return;
+            }
+            
+            // Extract access token from response URL
+            const hashPart = responseUrl.split('#')[1];
+            if (!hashPart) {
+                alert('Failed to authenticate with Gmail. Invalid response.');
+                return;
+            }
+            
+            const urlParams = new URLSearchParams(hashPart);
+            const token = urlParams.get('access_token');
+            const error = urlParams.get('error');
+            
+            if (error) {
+                const errorDescription = urlParams.get('error_description') || error;
+                alert(`Gmail authentication failed: ${error}\n\n${errorDescription}`);
+                return;
+            }
+            
+            if (token) {
+                chrome.storage.local.set({ gmailToken: token, gmailConnected: true }, () => {
+                    createGmailCard();
                 });
             } else {
-                alert('Gmail authentication requires a valid OAuth client ID. Please check the setup instructions.');
+                alert('Failed to authenticate with Gmail. No access token received.');
             }
-        }
+        });
     });
 }
 
@@ -2111,16 +2251,22 @@ async function checkAuthStatus() {
                 // Verify token is still valid
                 const userInfo = await getUserInfo(result.authToken);
                 if (userInfo) {
+                    console.log('✅ Edge: User authenticated, userInfo:', userInfo);
                     showAuthenticatedView(userInfo);
                     updateAuthUI(userInfo);
                     currentUserId = userInfo.id;
+                    console.log('✅ Edge: currentUserId set to:', currentUserId);
+                    // IMPORTANT: Create/update user in DB and load state
+                    await createOrUpdateUser(userInfo);
                 } else {
+                    console.error('❌ Edge: Token invalid, removing auth data');
                     chrome.storage.local.remove(['userInfo', 'authToken'], () => {
                         showUnauthenticatedView();
                         currentUserId = null;
                     });
                 }
             } else {
+                console.log('ℹ️ Edge: No stored auth data, showing unauthenticated view');
                 showUnauthenticatedView();
                 currentUserId = null;
             }
@@ -2130,6 +2276,7 @@ async function checkAuthStatus() {
     
     chrome.identity.getAuthToken({ interactive: false }, async (token) => {
         if (chrome.runtime.lastError || !token) {
+            console.log('ℹ️ Chrome: No auth token, showing unauthenticated view');
             chrome.storage.local.remove(['userInfo', 'authToken'], () => {
                 showUnauthenticatedView();
                 currentUserId = null;
@@ -2137,14 +2284,17 @@ async function checkAuthStatus() {
             return;
         }
         
+        console.log('🔑 Chrome: Got auth token, fetching user info');
         const userInfo = await getUserInfo(token);
         if (userInfo) {
+            console.log('✅ Chrome: User authenticated, userInfo:', userInfo);
             chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
                 showAuthenticatedView(userInfo);
                 updateAuthUI(userInfo);
                 await createOrUpdateUser(userInfo);
             });
         } else {
+            console.error('❌ Chrome: Failed to get user info, removing token');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
                 chrome.storage.local.remove(['userInfo', 'authToken'], () => {
                     showUnauthenticatedView();
@@ -2155,10 +2305,76 @@ async function checkAuthStatus() {
     });
 }
 
+// Show loading state while checking authentication
+function showLoadingState() {
+    const unauthenticatedView = document.getElementById('unauthenticatedView');
+    const toolbar = document.querySelector('.toolbar');
+    const canvas = document.getElementById('canvas');
+    
+    // Hide both views initially (using !important to override inline styles)
+    if (unauthenticatedView) {
+        unauthenticatedView.style.setProperty('display', 'none', 'important');
+    }
+    if (toolbar) {
+        toolbar.style.setProperty('display', 'none', 'important');
+    }
+    if (canvas) {
+        canvas.style.setProperty('display', 'none', 'important');
+    }
+    const authenticatedHeader = document.getElementById('authenticatedHeader');
+    if (authenticatedHeader) {
+        authenticatedHeader.style.setProperty('display', 'none', 'important');
+    }
+    
+    // Create or show loading indicator
+    let loadingIndicator = document.getElementById('authLoadingIndicator');
+    if (!loadingIndicator) {
+        loadingIndicator = document.createElement('div');
+        loadingIndicator.id = 'authLoadingIndicator';
+        loadingIndicator.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        `;
+        
+        const spinner = document.createElement('div');
+        spinner.style.cssText = `
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f0f0f0;
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        `;
+        
+        loadingIndicator.appendChild(spinner);
+        document.body.appendChild(loadingIndicator);
+    } else {
+        loadingIndicator.style.display = 'flex';
+    }
+}
+
+// Hide loading state
+function hideLoadingState() {
+    const loadingIndicator = document.getElementById('authLoadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
+
 function showUnauthenticatedView() {
-    document.getElementById('unauthenticatedView').style.display = 'flex';
-    document.querySelector('.toolbar').style.display = 'none';
-    document.getElementById('canvas').style.display = 'none';
+    // Hide loading first
+    hideLoadingState();
+    
+    document.getElementById('unauthenticatedView').style.setProperty('display', 'flex', 'important');
+    document.querySelector('.toolbar').style.setProperty('display', 'none', 'important');
+    document.getElementById('canvas').style.setProperty('display', 'none', 'important');
     document.body.classList.add('unauth-mode');
     const signinSection = document.querySelector('.unauth-signin-section');
     if (signinSection) {
@@ -2185,11 +2401,16 @@ function hideUnauthenticatedView() {
 }
 
 function showAuthenticatedView(userInfo) {
-    document.getElementById('unauthenticatedView').style.display = 'none';
-    document.querySelector('.toolbar').style.display = 'flex';
-    document.getElementById('canvas').style.display = 'block';
+    // Hide loading first
+    hideLoadingState();
+    
+    document.getElementById('unauthenticatedView').style.setProperty('display', 'none', 'important');
+    document.querySelector('.toolbar').style.setProperty('display', 'flex', 'important');
+    document.getElementById('canvas').style.setProperty('display', 'block', 'important');
+    document.getElementById('authenticatedHeader').style.setProperty('display', 'flex', 'important');
     document.body.classList.remove('unauth-mode');
     updateAuthUI(userInfo);
+    updateAuthenticatedHeader(userInfo);
 }
 
 function updateUnauthenticatedUI(userInfo = null) {
@@ -2224,6 +2445,45 @@ function updateUnauthenticatedUI(userInfo = null) {
     dateWeatherEl.textContent = `${dateStr} • Loading weather...`;
     
     fetchWeatherForUnauth(dateWeatherEl);
+}
+
+function updateAuthenticatedHeader(userInfo = null) {
+    const greetingEl = document.getElementById('authGreeting');
+    const dateWeatherEl = document.getElementById('authDateWeather');
+    
+    if (!greetingEl || !dateWeatherEl) {
+        console.warn('Authenticated header elements not found');
+        return;
+    }
+    
+    const now = new Date();
+    const hour = now.getHours();
+    let greeting = 'Good morning';
+    
+    if (hour >= 12 && hour < 17) {
+        greeting = 'Good afternoon';
+    } else if (hour >= 17) {
+        greeting = 'Good evening';
+    }
+    
+    // Add first name to greeting if user info is available
+    if (userInfo && userInfo.name) {
+        const firstName = userInfo.name.split(' ')[0];
+        greeting += `, ${firstName}`;
+    }
+    
+    greetingEl.textContent = greeting;
+    
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayName = days[now.getDay()];
+    const monthName = months[now.getMonth()];
+    const day = now.getDate();
+    const dateStr = `${dayName}, ${monthName} ${day}${getOrdinalSuffix(day)}`;
+    
+    dateWeatherEl.textContent = `${dateStr} • Loading weather...`;
+    
+    fetchWeatherForAuth(dateWeatherEl);
 }
 
 function getOrdinalSuffix(day) {
@@ -2272,12 +2532,92 @@ async function fetchWeatherForUnauth(element) {
     );
 }
 
+async function fetchWeatherForAuth(element) {
+    if (!navigator.geolocation) {
+        element.textContent = element.textContent.replace('Loading weather...', 'Weather unavailable');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const { latitude, longitude } = position.coords;
+            const weatherData = await fetchWeatherData(latitude, longitude);
+            
+            if (weatherData) {
+                const current = weatherData.current_weather;
+                const tempF = Math.round((current.temperature * 9/5) + 32);
+                const weatherDesc = getWeatherDescription(current.weathercode);
+                const descText = weatherDesc.split(' ').slice(1).join(' ').toLowerCase();
+                
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const now = new Date();
+                const dayName = days[now.getDay()];
+                const monthName = months[now.getMonth()];
+                const day = now.getDate();
+                const dateStr = `${dayName}, ${monthName} ${day}${getOrdinalSuffix(day)}`;
+                
+                element.textContent = `${dateStr} • ${tempF}°F, ${descText}`;
+            } else {
+                element.textContent = element.textContent.replace('Loading weather...', 'Weather unavailable');
+            }
+        },
+        () => {
+            element.textContent = element.textContent.replace('Loading weather...', 'Weather unavailable');
+        }
+    );
+}
+
 // Check if running in Microsoft Edge
 function isMicrosoftEdge() {
     return navigator.userAgent.indexOf('Edg') !== -1;
 }
 
+// Show/hide spinner on sign-in buttons
+function setSignInButtonLoading(loading) {
+    const signInBtn = document.getElementById('signInBtn');
+    const unauthSignInBtn = document.getElementById('unauthSignInBtn');
+    
+    const buttons = [signInBtn, unauthSignInBtn].filter(btn => btn !== null);
+    
+    buttons.forEach(btn => {
+        if (loading) {
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'wait';
+            const originalText = btn.textContent || btn.innerText;
+            btn.dataset.originalText = originalText;
+            btn.innerHTML = '<span style="display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;"></span>Signing in...';
+        } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            const originalText = btn.dataset.originalText || 'Sign in';
+            if (btn.id === 'signInBtn') {
+                btn.textContent = 'Sign in with Google';
+            } else {
+                btn.textContent = originalText;
+            }
+        }
+    });
+}
+
+// Add spinner animation CSS if not already added
+if (!document.getElementById('spinner-styles')) {
+    const style = document.createElement('style');
+    style.id = 'spinner-styles';
+    style.textContent = `
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 async function signInWithGoogle() {
+    // Show spinner immediately
+    setSignInButtonLoading(true);
+    
     // Check if we're in Microsoft Edge
     if (isMicrosoftEdge()) {
         // Use alternative OAuth flow for Edge
@@ -2291,45 +2631,48 @@ async function signInWithGoogle() {
             `response_type=token&` +
             `scope=${encodeURIComponent(scopes)}`;
         
-        // Launch OAuth flow
+        // Launch OAuth flow - modal opens immediately, so hide spinner
         chrome.identity.launchWebAuthFlow({
             url: authUrl,
             interactive: true
         }, async (responseUrl) => {
+            // Hide spinner when callback is triggered (modal opened)
+            setSignInButtonLoading(false);
+            
             if (chrome.runtime.lastError) {
                 console.error('Auth error:', chrome.runtime.lastError);
-                alert('Authentication failed. Please try again.');
+                const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
+                alert(`Authentication failed: ${errorMsg}\n\nPlease check:\n1. Your OAuth client ID is correct\n2. The redirect URI (${redirectUri}) is configured in Google Cloud Console\n3. You're using the correct Google account`);
                 return;
             }
             
-            if (responseUrl) {
-                // Extract access token from response URL
-                const urlParams = new URLSearchParams(responseUrl.split('#')[1]);
-                const token = urlParams.get('access_token');
-                
-                if (token) {
-                    const userInfo = await getUserInfo(token);
-                    if (userInfo) {
-                        chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
-                            showAuthenticatedView(userInfo);
-                            updateAuthUI(userInfo);
-                            await createOrUpdateUser(userInfo);
-                        });
-                    }
-                }
+            if (!responseUrl) {
+                alert('Authentication failed: No response received. Please try again.');
+                return;
             }
-        });
-        return;
-    }
-    
-    // Standard Chrome OAuth flow
-    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-        if (chrome.runtime.lastError) {
-            console.error('Auth error:', chrome.runtime.lastError);
-            return;
-        }
-        
-        if (token) {
+            
+            // Extract access token from response URL
+            const hashPart = responseUrl.split('#')[1];
+            if (!hashPart) {
+                alert('Authentication failed: Invalid response URL. Please try again.');
+                return;
+            }
+            
+            const urlParams = new URLSearchParams(hashPart);
+            const token = urlParams.get('access_token');
+            const error = urlParams.get('error');
+            
+            if (error) {
+                const errorDescription = urlParams.get('error_description') || error;
+                alert(`Authentication failed: ${error}\n\n${errorDescription}\n\nPlease check your OAuth configuration in Google Cloud Console.`);
+                return;
+            }
+            
+            if (!token) {
+                alert('Authentication failed: No access token received. Please try again.');
+                return;
+            }
+            
             const userInfo = await getUserInfo(token);
             if (userInfo) {
                 chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
@@ -2337,9 +2680,59 @@ async function signInWithGoogle() {
                     updateAuthUI(userInfo);
                     await createOrUpdateUser(userInfo);
                 });
+            } else {
+                alert('Authentication failed: Could not retrieve user information. The token may be invalid. Please try again.');
             }
+        });
+        // Note: Spinner will be hidden in the callback when modal opens
+        return;
+    }
+    
+    // Standard Chrome OAuth flow
+    // getAuthToken opens account selector immediately, so we hide spinner after a short delay
+    // to ensure the selector UI has appeared
+    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+        // Hide spinner when callback is triggered (account selector appeared)
+        setSignInButtonLoading(false);
+        
+        if (chrome.runtime.lastError) {
+            console.error('Auth error:', chrome.runtime.lastError);
+            const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
+            alert(`Authentication failed: ${errorMsg}\n\nPlease check:\n1. Your OAuth client ID is correct\n2. The redirect URI is configured in Google Cloud Console\n3. You're using the correct Google account`);
+            return;
+        }
+        
+        if (!token) {
+            alert('Authentication failed: No token received. Please try again.');
+            return;
+        }
+        
+        const userInfo = await getUserInfo(token);
+        if (userInfo) {
+            chrome.storage.local.set({ userInfo: userInfo, authToken: token }, async () => {
+                showAuthenticatedView(userInfo);
+                updateAuthUI(userInfo);
+                await createOrUpdateUser(userInfo);
+            });
+        } else {
+            alert('Authentication failed: Could not retrieve user information. The token may be invalid or expired. Please try again.');
+            // Remove invalid token
+            chrome.identity.removeCachedAuthToken({ token: token }, () => {
+                console.log('Removed invalid cached token');
+            });
         }
     });
+    
+    // For Chrome, hide spinner after a brief delay to ensure account selector UI appears
+    // The actual hiding happens in the callback, but this is a fallback
+    setTimeout(() => {
+        // Only hide if still loading (callback hasn't fired yet)
+        const signInBtn = document.getElementById('signInBtn');
+        if (signInBtn && signInBtn.disabled) {
+            // Account selector should be visible by now
+            setSignInButtonLoading(false);
+        }
+    }, 500);
 }
 
 async function signOutFromGoogle() {

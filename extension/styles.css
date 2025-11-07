@@ -1073,13 +1073,109 @@ body {
   background: #1a6ec7;
 }
 
+/* Authenticated header - shown when user is logged in */
+.authenticated-header {
+  display: none; /* Hidden by default - JavaScript will show it when authenticated */
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding-top: 52px;
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 10;
+}
+
+.auth-greeting {
+  font-family: "Rules", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-weight: 500;
+  font-size: 33px;
+  line-height: 140%;
+  letter-spacing: -0.66px;
+  color: #000;
+  margin-bottom: 16px;
+  width: 668px;
+  text-align: center;
+}
+
+.auth-date-weather {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  letter-spacing: 0%;
+  color: #9b9a97;
+  margin-bottom: 24px;
+  width: 668px;
+  text-align: center;
+}
+
+.auth-input-container {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 668px;
+  height: 64px;
+  border-radius: 100px;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding-right: 12px;
+}
+
+.auth-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 12px 12px 12px 32px;
+  height: 100%;
+  font-size: 16px;
+  color: #37352f;
+  background: white;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  border-radius: 100px 0 0 100px;
+}
+
+.auth-search-input::placeholder {
+  color: #9b9a97;
+}
+
+.auth-model-btn {
+  background: #37352f;
+  color: white;
+  border: none;
+  width: 220.0729217529297px;
+  height: 40px;
+  border-radius: 40px;
+  padding: 10px 32px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  transition: background 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.auth-model-btn:hover {
+  background: #2d2b27;
+}
+
 .unauthenticated-view {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100vh;
-  display: flex;
+  display: none; /* Hidden by default - JavaScript will show it when needed */
   flex-direction: column;
   align-items: center;
   padding-top: 0;
