@@ -73,29 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Authenticated search input and model button
-    const authSearchInput = document.getElementById('authSearchInput');
-    const authModelBtn = document.getElementById('authModelBtn');
-    
-    if (authSearchInput) {
-        authSearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                // Handle search when authenticated
-                const query = authSearchInput.value.trim();
-                if (query && currentUserId) {
-                    // Future: handle search functionality
-                    console.log('Search query:', query);
-                }
-            }
-        });
-    }
-    
-    if (authModelBtn) {
-        authModelBtn.addEventListener('click', () => {
-            // Future: show AI model selector dropdown
-            console.log('AI model selector clicked');
-        });
-    }
+    // Search input and model button (used for both authenticated and unauthenticated states)
+    // The unauthSearchInput and unauthModelBtn are used for both states
     
     document.querySelectorAll('.app-option').forEach(option => {
         option.addEventListener('click', (e) => {
@@ -113,12 +92,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function updateCanvasHeight() {
     const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+    
+    // Check if canvas is inside dots section (authenticated state)
+    const dotsSection = canvas.closest('.unauth-dots');
+    const isInDotsSection = dotsSection && canvas.style.display !== 'none';
+    
     if (cards.length === 0) {
-        canvas.style.minHeight = '100vh';
+        if (isInDotsSection) {
+            canvas.style.minHeight = '500px';
+        } else {
+            canvas.style.minHeight = '100vh';
+        }
         return;
     }
     
-    let maxBottom = window.innerHeight;
+    let maxBottom = isInDotsSection ? 500 : window.innerHeight;
     cards.forEach(card => {
         const cardEl = document.querySelector(`[data-id="${card.id}"]`);
         if (cardEl) {
@@ -129,14 +118,30 @@ function updateCanvasHeight() {
     });
     
     canvas.style.minHeight = maxBottom + 'px';
+    console.log('Canvas height updated to:', maxBottom + 'px', 'isInDotsSection:', isInDotsSection);
 }
 
 function createCard(type, data = {}) {
+    const canvas = document.getElementById('canvas');
+    let defaultX = window.innerWidth / 2 - 125;
+    let defaultY = window.innerHeight / 2 - 50;
+    
+    // If canvas is inside dots section (authenticated), adjust positioning
+    if (canvas) {
+        const dotsSection = canvas.closest('.unauth-dots');
+        if (dotsSection && canvas.style.display !== 'none') {
+            // Position relative to dots section
+            const dotsRect = dotsSection.getBoundingClientRect();
+            defaultX = dotsRect.width / 2 - 125;
+            defaultY = dotsRect.height / 2 - 50;
+        }
+    }
+    
     const card = {
         id: Date.now().toString(),
         type: type,
-        x: data.x || window.innerWidth / 2 - 125,
-        y: data.y || window.innerHeight / 2 - 50,
+        x: data.x || defaultX,
+        y: data.y || defaultY,
         content: data.content || ''
     };
     
@@ -245,7 +250,13 @@ function renderCard(card) {
     
     cardEl.addEventListener('mousedown', startDrag);
     
-    document.getElementById('canvas').appendChild(cardEl);
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+        canvas.appendChild(cardEl);
+        console.log('Card rendered:', card.type, 'at', card.x, card.y, 'canvas:', canvas.style.display);
+    } else {
+        console.error('Canvas not found when rendering card!');
+    }
     
     if (card.type === 'mercury') {
         renderMercuryCard(cardEl, card.id);
@@ -391,8 +402,12 @@ function saveCards() {
 
 function loadCards() {
     chrome.storage.local.get(['cards'], (result) => {
+        const canvas = document.getElementById('canvas');
+        console.log('loadCards called, canvas found:', !!canvas, 'canvas display:', canvas?.style.display);
+        
         if (result.cards) {
             cards = result.cards;
+            console.log('Loading', cards.length, 'cards');
             
             let needsSave = false;
             cards.forEach(card => {
@@ -412,8 +427,14 @@ function loadCards() {
                 saveCards();
             }
             
-            cards.forEach(card => renderCard(card));
+            cards.forEach(card => {
+                console.log('Rendering card:', card.type, 'at', card.x, card.y);
+                renderCard(card);
+            });
             updateCanvasHeight();
+            console.log('Cards rendered, total cards in DOM:', document.querySelectorAll('.card').length);
+        } else {
+            console.log('No cards found in storage');
         }
     });
 }
@@ -2321,10 +2342,6 @@ function showLoadingState() {
     if (canvas) {
         canvas.style.setProperty('display', 'none', 'important');
     }
-    const authenticatedHeader = document.getElementById('authenticatedHeader');
-    if (authenticatedHeader) {
-        authenticatedHeader.style.setProperty('display', 'none', 'important');
-    }
     
     // Create or show loading indicator
     let loadingIndicator = document.getElementById('authLoadingIndicator');
@@ -2374,20 +2391,49 @@ function showUnauthenticatedView() {
     
     document.getElementById('unauthenticatedView').style.setProperty('display', 'flex', 'important');
     document.querySelector('.toolbar').style.setProperty('display', 'none', 'important');
-    document.getElementById('canvas').style.setProperty('display', 'none', 'important');
-    document.body.classList.add('unauth-mode');
+    
+    const dotsSection = document.querySelector('.unauth-dots');
+    if (dotsSection) {
+        dotsSection.style.display = 'flex';
+        dotsSection.style.overflow = 'visible';
+        dotsSection.style.overflowY = 'visible';
+        
+        // Restore dots pattern
+        dotsSection.style.backgroundImage = 'radial-gradient(circle, rgba(22, 22, 22, 0.06) 2px, transparent 2px)';
+        dotsSection.style.backgroundSize = '24px 24px';
+        dotsSection.style.backgroundPosition = '0 0';
+        dotsSection.style.backgroundRepeat = 'repeat';
+        
+        // Show all card images
+        const cardImages = dotsSection.querySelectorAll('.unauth-yellow-card, .unauth-todo-card, .unauth-mercury-card, .unauth-calendar-card, .unauth-ssense-card');
+        cardImages.forEach(card => {
+            card.style.display = '';
+        });
+        
+        // Hide canvas
+        const canvas = dotsSection.querySelector('#canvas');
+        if (canvas) {
+            canvas.style.display = 'none';
+        }
+        
+        // Hide auth quote text
+        const authQuoteText = dotsSection.querySelector('.auth-quote-text');
+        if (authQuoteText) {
+            authQuoteText.style.display = 'none';
+        }
+    }
+    
     const signinSection = document.querySelector('.unauth-signin-section');
     if (signinSection) {
         signinSection.style.display = 'flex';
     }
-    const dotsSection = document.querySelector('.unauth-dots');
-    if (dotsSection) {
-        dotsSection.style.display = 'flex';
-    }
+    
     const bottomQuote = document.querySelector('.unauth-bottom-quote');
     if (bottomQuote) {
         bottomQuote.style.display = 'block';
     }
+    
+    document.body.classList.add('unauth-mode');
     updateUnauthenticatedUI();
 }
 
@@ -2404,13 +2450,126 @@ function showAuthenticatedView(userInfo) {
     // Hide loading first
     hideLoadingState();
     
-    document.getElementById('unauthenticatedView').style.setProperty('display', 'none', 'important');
+    // Keep unauthenticated header visible
+    document.getElementById('unauthenticatedView').style.setProperty('display', 'flex', 'important');
     document.querySelector('.toolbar').style.setProperty('display', 'flex', 'important');
-    document.getElementById('canvas').style.setProperty('display', 'block', 'important');
-    document.getElementById('authenticatedHeader').style.setProperty('display', 'flex', 'important');
+    
+    // Hide all cards and dots in the dots section, but keep background color (remove dots pattern)
+    const dotsSection = document.querySelector('.unauth-dots');
+    if (dotsSection) {
+        // Hide all card images
+        const cardImages = dotsSection.querySelectorAll('.unauth-yellow-card, .unauth-todo-card, .unauth-mercury-card, .unauth-calendar-card, .unauth-ssense-card');
+        cardImages.forEach(card => {
+            card.style.display = 'none';
+        });
+        
+        // Hide sign-in section
+        const signinSection = dotsSection.querySelector('.unauth-signin-section');
+        if (signinSection) {
+            signinSection.style.display = 'none';
+        }
+        
+        // Remove dots pattern, keep only background color
+        dotsSection.style.backgroundImage = 'none';
+        
+        // Show canvas inside dots section
+        const canvas = dotsSection.querySelector('#canvas');
+        if (canvas) {
+            console.log('Setting up canvas in dots section');
+            // Use setProperty with important to override any inline styles
+            // Use relative positioning so canvas expands with content and body scrolls
+            canvas.style.setProperty('display', 'block', 'important');
+            canvas.style.setProperty('position', 'relative', 'important');
+            canvas.style.setProperty('width', '100%', 'important');
+            canvas.style.setProperty('height', 'auto', 'important');
+            canvas.style.setProperty('min-height', '500px', 'important');
+            canvas.style.setProperty('overflow', 'visible', 'important');
+            canvas.style.setProperty('z-index', '10', 'important');
+            canvas.style.setProperty('padding', '0', 'important');
+            canvas.style.setProperty('margin', '0', 'important');
+            canvas.style.setProperty('pointer-events', 'auto', 'important');
+            canvas.style.setProperty('box-sizing', 'border-box', 'important');
+            console.log('Canvas display:', canvas.style.display, 'Canvas found:', !!canvas, 'Dots section size:', dotsSection.offsetWidth, 'x', dotsSection.offsetHeight);
+        } else {
+            console.error('Canvas not found in dots section!');
+        }
+        
+        // Make dots section not scrollable - let body scroll instead
+        dotsSection.style.overflow = 'visible';
+        dotsSection.style.overflowY = 'visible';
+        dotsSection.style.alignItems = 'flex-start';
+        dotsSection.style.justifyContent = 'flex-start';
+        // Allow dots section to expand beyond viewport
+        dotsSection.style.maxHeight = 'none';
+        dotsSection.style.height = 'auto';
+        // Add margin-top to account for sticky header
+        dotsSection.style.marginTop = '24px';
+        // Add padding-bottom to account for fixed bottom quote
+        dotsSection.style.paddingBottom = '80px';
+    }
+    
+    // Show bottom quote (same as unauthenticated)
+    const bottomQuote = document.querySelector('.unauth-bottom-quote');
+    if (bottomQuote) {
+        bottomQuote.style.display = 'block';
+    }
+    
+    // Hide the auth-quote-text (we're using the bottom quote instead)
+    const authQuoteText = document.querySelector('.auth-quote-text');
+    if (authQuoteText) {
+        authQuoteText.style.display = 'none';
+    }
+    
     document.body.classList.remove('unauth-mode');
     updateAuthUI(userInfo);
     updateAuthenticatedHeader(userInfo);
+    
+    // Load and render cards after canvas is visible
+    // Clear any existing cards from canvas first, then reload
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+        // Clear canvas
+        canvas.innerHTML = '';
+        
+        // Adjust card positions if they're outside the dots section bounds
+        // Wait a bit for layout to settle, then check and reposition cards
+        setTimeout(() => {
+            const dotsRect = dotsSection.getBoundingClientRect();
+            const maxX = Math.max(dotsRect.width - 300, 400); // Leave some margin, minimum 400px
+            const maxY = Math.max(dotsRect.height - 200, 300); // Leave some margin, minimum 300px
+            
+            chrome.storage.local.get(['cards'], (result) => {
+                if (result.cards) {
+                    let needsReposition = false;
+                    const updatedCards = result.cards.map(card => {
+                        const updatedCard = { ...card };
+                        // If card is positioned outside dots section, reposition it
+                        if (card.x > maxX || card.y > maxY || card.x < 0 || card.y < 0) {
+                            updatedCard.x = Math.min(Math.max(card.x, 50), maxX);
+                            updatedCard.y = Math.min(Math.max(card.y, 50), maxY);
+                            needsReposition = true;
+                            console.log('Repositioning card', card.id, 'from', card.x, card.y, 'to', updatedCard.x, updatedCard.y);
+                        }
+                        return updatedCard;
+                    });
+                    
+                    if (needsReposition) {
+                        chrome.storage.local.set({ cards: updatedCards }, () => {
+                            // Reload cards after repositioning
+                            loadCards();
+                        });
+                    }
+                }
+            });
+        }, 200);
+        
+        // Reload and render cards
+        loadCards();
+        // Update canvas height after cards are rendered
+        setTimeout(() => {
+            updateCanvasHeight();
+        }, 100);
+    }
 }
 
 function updateUnauthenticatedUI(userInfo = null) {
@@ -2448,11 +2607,12 @@ function updateUnauthenticatedUI(userInfo = null) {
 }
 
 function updateAuthenticatedHeader(userInfo = null) {
-    const greetingEl = document.getElementById('authGreeting');
-    const dateWeatherEl = document.getElementById('authDateWeather');
+    // Update the unauthenticated header elements (we're using the same header for both states)
+    const greetingEl = document.getElementById('unauthGreeting');
+    const dateWeatherEl = document.getElementById('unauthDateWeather');
     
     if (!greetingEl || !dateWeatherEl) {
-        console.warn('Authenticated header elements not found');
+        console.warn('Header elements not found');
         return;
     }
     
@@ -2483,7 +2643,7 @@ function updateAuthenticatedHeader(userInfo = null) {
     
     dateWeatherEl.textContent = `${dateStr} • Loading weather...`;
     
-    fetchWeatherForAuth(dateWeatherEl);
+    fetchWeatherForUnauth(dateWeatherEl);
 }
 
 function getOrdinalSuffix(day) {

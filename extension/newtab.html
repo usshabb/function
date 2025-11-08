@@ -8,10 +8,12 @@
     <style>
       /* Hide views immediately to prevent blinking - JavaScript will show the correct one */
       #unauthenticatedView,
-      .toolbar,
-      #canvas,
-      #authenticatedHeader {
+      .toolbar {
         display: none !important;
+      }
+      /* Canvas is hidden by default but will be shown when authenticated */
+      #canvas {
+        display: none;
       }
     </style>
   </head>
@@ -19,33 +21,35 @@
     <div id="reminderBanners" class="reminder-banners"></div>
 
     <div id="unauthenticatedView" class="unauthenticated-view">
-      <div class="unauth-greeting" id="unauthGreeting">Loading...</div>
-      <div class="unauth-date-weather" id="unauthDateWeather">Loading...</div>
-      <div class="unauth-input-container">
-        <input
-          type="text"
-          id="unauthSearchInput"
-          class="unauth-search-input"
-          placeholder="What you are looking for today?"
-        />
-        <button id="unauthModelBtn" class="unauth-model-btn">
-          <span>Select the AI model</span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M3 4.5L6 7.5L9 4.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
+      <div class="unauth-header-group">
+        <div class="unauth-greeting" id="unauthGreeting">Loading...</div>
+        <div class="unauth-date-weather" id="unauthDateWeather">Loading...</div>
+        <div class="unauth-input-container">
+          <input
+            type="text"
+            id="unauthSearchInput"
+            class="unauth-search-input"
+            placeholder="What you are looking for today?"
+          />
+          <button id="unauthModelBtn" class="unauth-model-btn">
+            <span>Select the AI model</span>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 4.5L6 7.5L9 4.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="unauth-dots">
         <img
@@ -86,6 +90,10 @@
             Sign in
           </button>
         </div>
+        <div class="auth-quote-text">
+          The best thing is going to be a quote here to be best.
+        </div>
+        <div id="canvas" class="canvas"></div>
       </div>
       <p class="unauth-bottom-quote">
         The best thing is going to be a quote here to be best.
@@ -190,40 +198,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Authenticated header section -->
-    <div id="authenticatedHeader" class="authenticated-header">
-      <div class="auth-greeting" id="authGreeting">Loading...</div>
-      <div class="auth-date-weather" id="authDateWeather">Loading...</div>
-      <div class="auth-input-container">
-        <input
-          type="text"
-          id="authSearchInput"
-          class="auth-search-input"
-          placeholder="What you are looking for today?"
-        />
-        <button id="authModelBtn" class="auth-model-btn">
-          <span>Select the AI model</span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M3 4.5L6 7.5L9 4.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <div id="canvas" class="canvas"></div>
 
     <script src="newtab.js"></script>
   </body>
