@@ -216,6 +216,9 @@ body {
   max-width: 400px;
   cursor: move;
   transition: box-shadow 0.2s;
+  z-index: 100;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .card:hover {
@@ -1184,6 +1187,33 @@ body {
   justify-content: flex-start;
 }
 
+/* When authenticated, allow body scrolling instead of fixed view */
+body:not(.unauth-mode) .unauthenticated-view {
+  position: relative;
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+/* Header group wrapper - sticky when authenticated */
+.unauth-header-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* When authenticated, make header group sticky at top */
+body:not(.unauth-mode) .unauth-header-group {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(228, 223, 217, 1);
+  padding-top: 52px;
+  padding-bottom: 24px;
+  width: 100%;
+}
+
 .unauth-greeting {
   font-family: "Rules", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -1196,6 +1226,11 @@ body {
   margin-top: 52px;
   width: 668px;
   text-align: center;
+}
+
+/* When authenticated, adjust margins for sticky header */
+body:not(.unauth-mode) .unauth-greeting {
+  margin-top: 0;
 }
 
 .unauth-date-weather {
@@ -1293,9 +1328,41 @@ body {
   background-position: 0 0;
   background-repeat: repeat;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   box-sizing: border-box;
+}
+
+/* When authenticated, allow dots section to expand for body scrolling */
+body:not(.unauth-mode) .unauth-dots {
+  max-height: none;
+  height: auto;
+  overflow: visible;
+  overflow-y: visible;
+}
+
+.auth-quote-text {
+  display: none;
+}
+
+.unauth-dots #canvas {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: visible;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+/* When authenticated, canvas should expand with content */
+body:not(.unauth-mode) .unauth-dots #canvas {
+  position: relative;
+  height: auto;
+  min-height: 500px;
 }
 
 .unauth-yellow-card {
@@ -1461,6 +1528,21 @@ body {
   max-width: 668px;
   box-sizing: border-box;
   z-index: 10;
+}
+
+/* When authenticated, make bottom quote fixed at bottom */
+body:not(.unauth-mode) .unauth-bottom-quote {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transform: none;
+  background: rgba(228, 223, 217, 1);
+  padding: 20px 16px;
+  width: 100%;
+  max-width: 100%;
+  z-index: 1000;
+  margin: 0;
 }
 
 @media (max-width: 768px) {
