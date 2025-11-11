@@ -3142,7 +3142,17 @@ function showUnauthenticatedView() {
     const bottomQuote = document.querySelector('.unauth-bottom-quote');
     if (bottomQuote) {
         bottomQuote.style.display = 'block';
+        bottomQuote.textContent = "The best thing is going to be a quote here to be best.";
     }
+    
+    // Hide buttons when unauthenticated
+    const leftBtn = document.getElementById('authBottomBtnLeft');
+    const rightBtn = document.getElementById('authBottomBtnRight');
+    if (leftBtn) leftBtn.style.display = 'none';
+    if (rightBtn) rightBtn.style.display = 'none';
+    
+    // Stop GMT time update
+    stopGMTTimeUpdate();
     
     document.body.classList.add('unauth-mode');
     updateUnauthenticatedUI();
@@ -3219,11 +3229,21 @@ function showAuthenticatedView(userInfo) {
         dotsSection.style.paddingBottom = '80px';
     }
     
-    // Show bottom quote (same as unauthenticated)
+    // Show bottom quote with authenticated message
     const bottomQuote = document.querySelector('.unauth-bottom-quote');
     if (bottomQuote) {
         bottomQuote.style.display = 'block';
+        bottomQuote.textContent = "Become the best version of yourself, the world is waiting.";
     }
+    
+    // Show buttons when authenticated
+    const leftBtn = document.getElementById('authBottomBtnLeft');
+    const rightBtn = document.getElementById('authBottomBtnRight');
+    if (leftBtn) leftBtn.style.display = 'flex';
+    if (rightBtn) rightBtn.style.display = 'flex';
+    
+    // Start updating GMT time
+    startGMTTimeUpdate();
     
     // Hide the auth-quote-text (we're using the bottom quote instead)
     const authQuoteText = document.querySelector('.auth-quote-text');
@@ -3661,6 +3681,47 @@ async function getUserInfo(token) {
     } catch (error) {
         console.error('Error fetching user info:', error);
         return null;
+    }
+}
+
+let gmtTimeInterval = null;
+
+function updateGMTTime() {
+    const gmtTimeElement = document.getElementById('gmtTime');
+    if (!gmtTimeElement) return;
+    
+    const now = new Date();
+    // Get GMT time by using UTC methods
+    let hours = now.getUTCHours();
+    const minutes = now.getUTCMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    
+    const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+    const hoursStr = hours < 10 ? '0' + hours : hours;
+    
+    gmtTimeElement.textContent = `${hoursStr}:${minutesStr} ${ampm}`;
+}
+
+function startGMTTimeUpdate() {
+    // Clear any existing interval
+    if (gmtTimeInterval) {
+        clearInterval(gmtTimeInterval);
+    }
+    
+    // Update immediately
+    updateGMTTime();
+    
+    // Update every second
+    gmtTimeInterval = setInterval(updateGMTTime, 1000);
+}
+
+function stopGMTTimeUpdate() {
+    if (gmtTimeInterval) {
+        clearInterval(gmtTimeInterval);
+        gmtTimeInterval = null;
     }
 }
 
