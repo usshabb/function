@@ -212,13 +212,14 @@ body {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   padding: 16px;
-  min-width: 250px;
-  max-width: 400px;
+  min-width: 200px;
   cursor: move;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
   z-index: 100;
   visibility: visible !important;
   opacity: 1 !important;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .card:hover {
@@ -226,8 +227,45 @@ body {
 }
 
 .card.dragging {
-  opacity: 0.7;
   cursor: grabbing;
+  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+}
+
+.card.drop-target {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(35, 131, 226, 0.3);
+}
+
+.card.resizing {
+  z-index: 1000;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 12px 12px;
+  border-color: transparent transparent #9b9a97 transparent;
+}
+
+.card:hover .resize-handle::after {
+  border-color: transparent transparent #37352f transparent;
 }
 
 .card-header {
@@ -261,6 +299,9 @@ body {
 
 .card-content {
   color: #37352f;
+  height: calc(100% - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .card-content textarea {
