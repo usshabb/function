@@ -900,6 +900,13 @@ function deleteCard(cardId) {
     if (cardEl) {
         cardEl.remove();
     }
+    
+    // Reset exactPosition on all remaining cards to force rearrangement
+    cards.forEach(card => {
+        card.exactPosition = false;
+    });
+    
+    // Rearrange cards to fill the gap, similar to when adding a card
     arrangeMasonryLayout();
     saveCards();
     updateCanvasHeight();
@@ -3001,38 +3008,7 @@ async function checkAuthStatus() {
             });
         } else {
             // Token might be expired, try to refresh it
-            console.log('🔄 Chrome: Token may be expired, attempting to refresh...');
-            chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                // Try to get a fresh token (non-interactive refresh)
-                chrome.identity.getAuthToken({ interactive: false }, async (newToken) => {
-                    if (chrome.runtime.lastError || !newToken) {
-                        console.error('❌ Chrome: Failed to refresh token, showing unauthenticated view');
-                        chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                            showUnauthenticatedView();
-                            currentUserId = null;
-                        });
-                        return;
-                    }
-                    
-                    // Try again with the new token
-                    console.log('🔄 Chrome: Got refreshed token, verifying...');
-                    const refreshedUserInfo = await getUserInfo(newToken);
-                    if (refreshedUserInfo) {
-                        console.log('✅ Chrome: Token refreshed successfully, userInfo:', refreshedUserInfo);
-                        chrome.storage.local.set({ userInfo: refreshedUserInfo, authToken: newToken }, async () => {
-                            showAuthenticatedView(refreshedUserInfo);
-                            updateAuthUI(refreshedUserInfo);
-                            await createOrUpdateUser(refreshedUserInfo);
-                        });
-                    } else {
-                        console.error('❌ Chrome: Refreshed token also invalid, showing unauthenticated view');
-                        chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                            showUnauthenticatedView();
-                            currentUserId = null;
-                        });
-                    }
-                });
-            });
+            await refreshAuthToken(token);
         }
     });
 }
@@ -3653,6 +3629,90 @@ async function signOutFromGoogle() {
     });
 }
 
+// Helper function to refresh auth token with better error handling
+async function refreshAuthToken(oldToken) {
+    return new Promise((resolve) => {
+        console.log('🔄 Chrome: Attempting to refresh auth token...');
+        
+        // Remove old cached token
+        chrome.identity.removeCachedAuthToken({ token: oldToken }, () => {
+            // Try to get a fresh token (Chrome will auto-refresh if possible)
+            chrome.identity.getAuthToken({ interactive: false }, async (newToken) => {
+                if (chrome.runtime.lastError || !newToken) {
+                    const error = chrome.runtime.lastError?.message || 'Unknown error';
+                    console.error('❌ Chrome: Token refresh failed:', error);
+                    
+                    // Check if we have stored userInfo for graceful degradation
+                    chrome.storage.local.get(['userInfo'], (result) => {
+                        if (result.userInfo) {
+                            // Only keep logged in if it's likely a network/backend issue, not auth issue
+                            // Check if error suggests network problem vs auth revocation
+                            const isNetworkError = error.includes('network') || error.includes('timeout') || 
+                                                  error.includes('ECONNREFUSED') || !error.includes('invalid');
+                            
+                            if (isNetworkError) {
+                                console.log('⚠️ Chrome: Network issue detected, keeping user logged in with stored info');
+                                showAuthenticatedView(result.userInfo);
+                                updateAuthUI(result.userInfo);
+                                resolve(false); // Indicates we're using fallback
+                            } else {
+                                // Auth was revoked or invalid - must logout
+                                console.error('❌ Chrome: Auth error detected, logging out');
+                                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                                    showUnauthenticatedView();
+                                    currentUserId = null;
+                                });
+                                resolve(false);
+                            }
+                        } else {
+                            // No stored userInfo - must logout
+                            console.error('❌ Chrome: No stored userInfo, showing unauthenticated view');
+                            chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                                showUnauthenticatedView();
+                                currentUserId = null;
+                            });
+                            resolve(false);
+                        }
+                    });
+                    return;
+                }
+                
+                // Verify the new token works
+                console.log('🔄 Chrome: Got refreshed token, verifying...');
+                const refreshedUserInfo = await getUserInfo(newToken);
+                
+                if (refreshedUserInfo) {
+                    console.log('✅ Chrome: Token refreshed successfully');
+                    chrome.storage.local.set({ userInfo: refreshedUserInfo, authToken: newToken }, async () => {
+                        showAuthenticatedView(refreshedUserInfo);
+                        updateAuthUI(refreshedUserInfo);
+                        await createOrUpdateUser(refreshedUserInfo);
+                    });
+                    resolve(true);
+                } else {
+                    // New token also doesn't work - check if network issue
+                    chrome.storage.local.get(['userInfo'], (result) => {
+                        if (result.userInfo) {
+                            // Likely network issue since we got a token but can't verify
+                            console.log('⚠️ Chrome: Token refresh succeeded but verification failed (likely network issue)');
+                            showAuthenticatedView(result.userInfo);
+                            updateAuthUI(result.userInfo);
+                            resolve(false);
+                        } else {
+                            console.error('❌ Chrome: Refreshed token invalid and no stored userInfo');
+                            chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                                showUnauthenticatedView();
+                                currentUserId = null;
+                            });
+                            resolve(false);
+                        }
+                    });
+                }
+            });
+        });
+    });
+}
+
 async function getUserInfo(token) {
     try {
         const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -3666,20 +3726,18 @@ async function getUserInfo(token) {
         }
         
         if (response.status === 401) {
-            // Only try to remove cached token if not in Edge
-            if (!isMicrosoftEdge()) {
-                chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                    console.log('Removed invalid cached token');
-                });
-            } else {
-                // For Edge, just log the error
-                console.log('Invalid token detected');
-            }
+            // Token is invalid/expired - don't remove it here, let the caller handle refresh
+            console.log('⚠️ Token returned 401 - may need refresh');
+            return null;
         }
         
+        // Other errors (network, etc.) - don't treat as auth failure
+        console.warn('⚠️ getUserInfo error:', response.status, response.statusText);
         return null;
     } catch (error) {
-        console.error('Error fetching user info:', error);
+        // Network errors shouldn't cause logout - might be temporary
+        console.error('⚠️ Network error fetching user info (not treating as auth failure):', error);
+        // Return null but don't remove token - might be temporary network issue
         return null;
     }
 }
