@@ -3000,11 +3000,37 @@ async function checkAuthStatus() {
                 await createOrUpdateUser(userInfo);
             });
         } else {
-            console.error('❌ Chrome: Failed to get user info, removing token');
+            // Token might be expired, try to refresh it
+            console.log('🔄 Chrome: Token may be expired, attempting to refresh...');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    showUnauthenticatedView();
-                    currentUserId = null;
+                // Try to get a fresh token (non-interactive refresh)
+                chrome.identity.getAuthToken({ interactive: false }, async (newToken) => {
+                    if (chrome.runtime.lastError || !newToken) {
+                        console.error('❌ Chrome: Failed to refresh token, showing unauthenticated view');
+                        chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                            showUnauthenticatedView();
+                            currentUserId = null;
+                        });
+                        return;
+                    }
+                    
+                    // Try again with the new token
+                    console.log('🔄 Chrome: Got refreshed token, verifying...');
+                    const refreshedUserInfo = await getUserInfo(newToken);
+                    if (refreshedUserInfo) {
+                        console.log('✅ Chrome: Token refreshed successfully, userInfo:', refreshedUserInfo);
+                        chrome.storage.local.set({ userInfo: refreshedUserInfo, authToken: newToken }, async () => {
+                            showAuthenticatedView(refreshedUserInfo);
+                            updateAuthUI(refreshedUserInfo);
+                            await createOrUpdateUser(refreshedUserInfo);
+                        });
+                    } else {
+                        console.error('❌ Chrome: Refreshed token also invalid, showing unauthenticated view');
+                        chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                            showUnauthenticatedView();
+                            currentUserId = null;
+                        });
+                    }
                 });
             });
         }
