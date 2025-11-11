@@ -4,6 +4,12 @@ let offset = { x: 0, y: 0 };
 let tasks = [];
 let reminders = [];
 let reminderCheckInterval = null;
+let resizingCard = null;
+let resizeHandle = null;
+let masonryGap = 12; // Gap between cards in masonry layout
+let masonryColumnWidth = 280; // Base column width for masonry
+let dragOverCard = null; // Card being dragged over
+let dropIndicator = null; // Visual indicator for drop zone
 
 // Detect if we're in a Chrome extension (hostname will be extension ID, not localhost)
 function isChromeExtension() {
@@ -88,6 +94,16 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAppModal();
         }
     });
+    
+    // Handle window resize to rearrange masonry layout
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            arrangeMasonryLayout();
+            updateCanvasHeight();
+        }, 250);
+    });
 });
 
 function updateCanvasHeight() {
@@ -122,33 +138,61 @@ function updateCanvasHeight() {
 }
 
 function createCard(type, data = {}) {
-    const canvas = document.getElementById('canvas');
-    let defaultX = window.innerWidth / 2 - 125;
-    let defaultY = window.innerHeight / 2 - 50;
-    
-    // If canvas is inside dots section (authenticated), adjust positioning
-    if (canvas) {
-        const dotsSection = canvas.closest('.unauth-dots');
-        if (dotsSection && canvas.style.display !== 'none') {
-            // Position relative to dots section
-            const dotsRect = dotsSection.getBoundingClientRect();
-            defaultX = dotsRect.width / 2 - 125;
-            defaultY = dotsRect.height / 2 - 50;
-        }
-    }
-    
     const card = {
         id: Date.now().toString(),
         type: type,
-        x: data.x || defaultX,
-        y: data.y || defaultY,
-        content: data.content || ''
+        x: data.x || 0,
+        y: data.y || 0,
+        width: data.width || getDefaultCardWidth(type),
+        height: data.height || getDefaultCardHeight(type),
+        content: data.content || '',
+        exactPosition: true // Flag to preserve exact position
     };
     
     cards.push(card);
     renderCard(card);
+    // Only arrange in masonry if no exact position was provided
+    if (!data.x && !data.y) {
+        arrangeMasonryLayout();
+    }
     saveCards();
     updateCanvasHeight();
+}
+
+function getDefaultCardWidth(type) {
+    const widths = {
+        'mercury': 350,
+        'gmail': 400,
+        'tasks': 350,
+        'reminder': 350,
+        'ssense': 500,
+        'weather': 300,
+        'history': 350,
+        'rss': 450,
+        'note': 300,
+        'link': 300,
+        'chatgpt': 400,
+        'google': 400
+    };
+    return widths[type] || 300;
+}
+
+function getDefaultCardHeight(type) {
+    const heights = {
+        'mercury': 400,
+        'gmail': 500,
+        'tasks': 300,
+        'reminder': 200,
+        'ssense': 600,
+        'weather': 250,
+        'history': 500,
+        'rss': 600,
+        'note': 200,
+        'link': 150,
+        'chatgpt': 500,
+        'google': 300
+    };
+    return heights[type] || 200;
 }
 
 function renderCard(card) {
@@ -157,6 +201,8 @@ function renderCard(card) {
     cardEl.dataset.id = card.id;
     cardEl.style.left = card.x + 'px';
     cardEl.style.top = card.y + 'px';
+    cardEl.style.width = (card.width || getDefaultCardWidth(card.type)) + 'px';
+    cardEl.style.height = (card.height || getDefaultCardHeight(card.type)) + 'px';
     
     const header = document.createElement('div');
     header.className = 'card-header';
@@ -210,43 +256,28 @@ function renderCard(card) {
         } else {
             renderLinkInput(content, card.id);
         }
-    } else if (card.type === 'mercury') {
-        cardEl.style.minWidth = '350px';
-        cardEl.style.maxWidth = '350px';
     } else if (card.type === 'chatgpt') {
         cardEl.style.cursor = 'default';
     } else if (card.type === 'google') {
         cardEl.style.cursor = 'default';
-    } else if (card.type === 'gmail') {
-        cardEl.style.minWidth = '400px';
-        cardEl.style.maxWidth = '400px';
     } else if (card.type === 'tasks') {
-        cardEl.style.minWidth = '350px';
-        cardEl.style.maxWidth = '350px';
         cardEl.style.cursor = 'default';
     } else if (card.type === 'reminder') {
-        cardEl.style.minWidth = '350px';
-        cardEl.style.maxWidth = '350px';
-        cardEl.style.cursor = 'default';
-    } else if (card.type === 'ssense') {
-        cardEl.style.minWidth = '500px';
-        cardEl.style.maxWidth = '500px';
-        cardEl.style.cursor = 'default';
-    } else if (card.type === 'weather') {
-        cardEl.style.minWidth = '300px';
-        cardEl.style.maxWidth = '300px';
-        cardEl.style.cursor = 'default';
-    } else if (card.type === 'history') {
-        cardEl.style.minWidth = '350px';
-        cardEl.style.maxWidth = '350px';
-        cardEl.style.cursor = 'default';
-    } else if (card.type === 'rss') {
-        cardEl.style.minWidth = '450px';
-        cardEl.style.maxWidth = '450px';
         cardEl.style.cursor = 'default';
     }
     
     cardEl.appendChild(content);
+    
+    // Add resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    resizeHandle.style.cssText = 'position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; cursor: nwse-resize; background: transparent; z-index: 10;';
+    cardEl.appendChild(resizeHandle);
+    
+    resizeHandle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        startResize(card.id, e);
+    });
     
     cardEl.addEventListener('mousedown', startDrag);
     
@@ -333,48 +364,526 @@ function reloadCard(cardId) {
 }
 
 function startDrag(e) {
-    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') {
+    // Don't start drag if clicking on interactive elements or resize handle
+    if (e.target.tagName === 'TEXTAREA' || 
+        e.target.tagName === 'INPUT' || 
+        e.target.tagName === 'BUTTON' || 
+        e.target.tagName === 'A' ||
+        e.target.classList.contains('resize-handle') ||
+        e.target.closest('.resize-handle')) {
         return;
     }
     
     draggedCard = e.currentTarget;
-    const rect = draggedCard.getBoundingClientRect();
-    offset.x = e.clientX - rect.left;
-    offset.y = e.clientY - rect.top;
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+    
+    const canvasRect = canvas.getBoundingClientRect();
+    const cardRect = draggedCard.getBoundingClientRect();
+    
+    // Calculate offset relative to canvas, accounting for current card position
+    offset.x = e.clientX - cardRect.left;
+    offset.y = e.clientY - cardRect.top;
+    
+    // Store initial position for reference
+    const initialLeft = parseInt(draggedCard.style.left) || 0;
+    const initialTop = parseInt(draggedCard.style.top) || 0;
+    draggedCard.dataset.initialX = initialLeft;
+    draggedCard.dataset.initialY = initialTop;
     
     draggedCard.classList.add('dragging');
+    draggedCard.style.zIndex = '1000';
+    draggedCard.style.transition = 'none';
+    draggedCard.style.opacity = '0.8';
+    draggedCard.style.transform = 'rotate(2deg) scale(1.02)';
+    draggedCard.style.pointerEvents = 'none'; // Prevent interference with hover detection
+    
+    // Create drop indicator
+    createDropIndicator();
     
     document.addEventListener('mousemove', drag);
     document.addEventListener('mouseup', stopDrag);
+    e.preventDefault();
+    e.stopPropagation();
 }
 
 function drag(e) {
     if (!draggedCard) return;
     
-    const x = e.clientX - offset.x;
-    const y = e.clientY - offset.y;
+    // Get canvas position to calculate relative coordinates
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
     
-    draggedCard.style.left = x + 'px';
-    draggedCard.style.top = y + 'px';
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    // Calculate position relative to canvas, accounting for scroll
+    const scrollX = window.scrollX || window.pageXOffset || 0;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const x = e.clientX - canvasRect.left - offset.x;
+    const y = e.clientY - canvasRect.top - offset.y;
+    
+    // Ensure card doesn't go outside canvas bounds
+    const cardWidth = draggedCard.offsetWidth;
+    const cardHeight = draggedCard.offsetHeight;
+    const minX = 0;
+    const minY = 0;
+    const maxX = canvasRect.width - cardWidth;
+    const maxY = Math.max(canvasRect.height - cardHeight, minY);
+    
+    const clampedX = Math.max(minX, Math.min(maxX, x));
+    const clampedY = Math.max(minY, Math.min(maxY, y));
+    
+    // Update dragged card position smoothly
+    draggedCard.style.transition = 'none';
+    draggedCard.style.left = clampedX + 'px';
+    draggedCard.style.top = clampedY + 'px';
+    
+    // Auto-scroll when dragging near viewport edges
+    const scrollThreshold = 80; // Distance from edge to trigger scroll
+    const scrollSpeed = 15; // Pixels to scroll per frame
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Vertical scrolling - more aggressive for better UX
+    if (e.clientY < scrollThreshold && window.scrollY > 0) {
+        // Near top - scroll up
+        const scrollAmount = Math.min(scrollSpeed, window.scrollY);
+        window.scrollBy(0, -scrollAmount);
+        // Adjust card position to account for scroll
+        draggedCard.style.top = (parseInt(draggedCard.style.top) || 0) - scrollAmount + 'px';
+    } else if (e.clientY > viewportHeight - scrollThreshold) {
+        // Near bottom - scroll down
+        window.scrollBy(0, scrollSpeed);
+        // Adjust card position to account for scroll
+        draggedCard.style.top = (parseInt(draggedCard.style.top) || 0) + scrollSpeed + 'px';
+    }
+    
+    // Horizontal scrolling (if needed)
+    if (e.clientX < scrollThreshold && window.scrollX > 0) {
+        // Near left - scroll left
+        const scrollAmount = Math.min(scrollSpeed, window.scrollX);
+        window.scrollBy(-scrollAmount, 0);
+        draggedCard.style.left = (parseInt(draggedCard.style.left) || 0) - scrollAmount + 'px';
+    } else if (e.clientX > viewportWidth - scrollThreshold) {
+        // Near right - scroll right
+        window.scrollBy(scrollSpeed, 0);
+        draggedCard.style.left = (parseInt(draggedCard.style.left) || 0) + scrollSpeed + 'px';
+    }
+    
+    // Check which card we're hovering over (exclude the dragged card)
+    const hoveredCard = getCardAtPosition(e.clientX, e.clientY);
+    
+    if (hoveredCard && hoveredCard !== draggedCard && hoveredCard !== dragOverCard) {
+        // Show drop indicator on the hovered card
+        showDropIndicator(hoveredCard);
+        dragOverCard = hoveredCard;
+    } else if (!hoveredCard && dragOverCard) {
+        // Hide drop indicator if not over any card
+        hideDropIndicator();
+        dragOverCard = null;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function getCardAtPosition(clientX, clientY) {
+    // Get all cards except the one being dragged
+    const allCards = Array.from(document.querySelectorAll('.card')).filter(card => 
+        !card.classList.contains('dragging') && card !== draggedCard
+    );
+    
+    // Check cards in reverse order (top to bottom) to get the topmost card
+    for (let i = allCards.length - 1; i >= 0; i--) {
+        const card = allCards[i];
+        const rect = card.getBoundingClientRect();
+        
+        // Check if point is within card bounds
+        if (clientX >= rect.left && clientX <= rect.right &&
+            clientY >= rect.top && clientY <= rect.bottom) {
+            return card;
+        }
+    }
+    return null;
+}
+
+function createDropIndicator() {
+    if (dropIndicator) return;
+    
+    dropIndicator = document.createElement('div');
+    dropIndicator.className = 'drop-indicator';
+    dropIndicator.style.cssText = `
+        position: absolute;
+        border: 2px dashed #2383e2;
+        background: rgba(35, 131, 226, 0.1);
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 999;
+        display: none;
+        transition: all 0.2s ease;
+    `;
+    document.getElementById('canvas').appendChild(dropIndicator);
+}
+
+function showDropIndicator(targetCard) {
+    if (!dropIndicator || !targetCard) return;
+    
+    const rect = targetCard.getBoundingClientRect();
+    const canvas = document.getElementById('canvas');
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    dropIndicator.style.display = 'block';
+    dropIndicator.style.left = (rect.left - canvasRect.left) + 'px';
+    dropIndicator.style.top = (rect.top - canvasRect.top) + 'px';
+    dropIndicator.style.width = rect.width + 'px';
+    dropIndicator.style.height = rect.height + 'px';
+    
+    targetCard.classList.add('drop-target');
+}
+
+function hideDropIndicator() {
+    if (!dropIndicator) return;
+    dropIndicator.style.display = 'none';
+    
+    // Remove drop-target class from all cards
+    document.querySelectorAll('.card.drop-target').forEach(card => {
+        card.classList.remove('drop-target');
+    });
+}
+
+function checkCardOverlap(cardX, cardY, cardWidth, cardHeight, excludeCardId) {
+    // Check if a card at the given position would overlap with any other card
+    for (const card of cards) {
+        if (card.id === excludeCardId) continue;
+        
+        const otherX = card.x || 0;
+        const otherY = card.y || 0;
+        const otherWidth = card.width || getDefaultCardWidth(card.type);
+        const otherHeight = card.height || getDefaultCardHeight(card.type);
+        
+        // Check for overlap
+        if (!(cardX + cardWidth <= otherX || 
+              cardX >= otherX + otherWidth || 
+              cardY + cardHeight <= otherY || 
+              cardY >= otherY + otherHeight)) {
+            return true; // Overlap detected
+        }
+    }
+    return false; // No overlap
+}
+
+function findNearestMasonryPosition(cardWidth, cardHeight, excludeCardId) {
+    // Find the nearest valid masonry position that doesn't overlap
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const canvasRect = canvas.getBoundingClientRect();
+    const canvasWidth = canvasRect.width || window.innerWidth;
+    const startX = masonryGap;
+    const startY = masonryGap;
+    
+    // Calculate column layout
+    const minCardWidth = Math.min(...cards.map(c => c.width || getDefaultCardWidth(c.type)));
+    const baseColumnWidth = Math.max(minCardWidth, masonryColumnWidth);
+    const numColumns = Math.max(1, Math.floor((canvasWidth - masonryGap * 2) / (baseColumnWidth + masonryGap)));
+    const actualColumnWidth = numColumns > 0 ? (canvasWidth - (numColumns + 1) * masonryGap) / numColumns : baseColumnWidth;
+    
+    // Track height of each column
+    const columnHeights = new Array(numColumns || 1).fill(startY);
+    
+    // Calculate column heights based on existing cards
+    cards.forEach(card => {
+        if (card.id === excludeCardId) return;
+        
+        const cWidth = card.width || getDefaultCardWidth(card.type);
+        const cHeight = card.height || getDefaultCardHeight(card.type);
+        
+        // Find which column this card is in
+        const cardColumn = Math.floor((card.x - startX) / (actualColumnWidth + masonryGap));
+        const validColumn = Math.max(0, Math.min(numColumns - 1, cardColumn));
+        
+        const cardBottom = card.y + cHeight;
+        if (columnHeights[validColumn] < cardBottom) {
+            columnHeights[validColumn] = cardBottom;
+        }
+    });
+    
+    // Find the shortest column
+    let shortestColumn = 0;
+    let shortestHeight = columnHeights[0];
+    for (let i = 1; i < columnHeights.length; i++) {
+        if (columnHeights[i] < shortestHeight) {
+            shortestHeight = columnHeights[i];
+            shortestColumn = i;
+        }
+    }
+    
+    // Calculate position in shortest column
+    const x = startX + shortestColumn * (actualColumnWidth + masonryGap);
+    const y = shortestHeight === startY ? startY : shortestHeight + masonryGap;
+    
+    return { x, y };
 }
 
 function stopDrag() {
     if (!draggedCard) return;
     
-    draggedCard.classList.remove('dragging');
-    
     const cardId = draggedCard.dataset.id;
-    const card = cards.find(c => c.id === cardId);
-    if (card) {
-        card.x = parseInt(draggedCard.style.left);
-        card.y = parseInt(draggedCard.style.top);
-        saveCards();
-        updateCanvasHeight();
+    const draggedCardData = cards.find(c => c.id === cardId);
+    
+    if (draggedCardData) {
+        // Get the EXACT final position where the card is visually shown
+        const finalX = parseInt(draggedCard.style.left) || parseInt(draggedCard.dataset.initialX) || draggedCardData.x;
+        const finalY = parseInt(draggedCard.style.top) || parseInt(draggedCard.dataset.initialY) || draggedCardData.y;
+        const finalWidth = parseInt(draggedCard.style.width) || draggedCardData.width;
+        const finalHeight = parseInt(draggedCard.style.height) || draggedCardData.height;
+        
+        // Check if dropping on another card (swap)
+        if (dragOverCard && dragOverCard !== draggedCard) {
+            const targetCardId = dragOverCard.dataset.id;
+            const targetCardData = cards.find(c => c.id === targetCardId);
+            
+            if (targetCardData) {
+                // Swap positions exactly
+                const tempX = draggedCardData.x;
+                const tempY = draggedCardData.y;
+                draggedCardData.x = targetCardData.x;
+                draggedCardData.y = targetCardData.y;
+                targetCardData.x = tempX;
+                targetCardData.y = tempY;
+                
+                // Update target card position
+                const targetCardEl = document.querySelector(`[data-id="${targetCardId}"]`);
+                if (targetCardEl) {
+                    targetCardEl.style.transition = 'left 0.3s ease, top 0.3s ease';
+                    targetCardEl.style.left = targetCardData.x + 'px';
+                    targetCardEl.style.top = targetCardData.y + 'px';
+                    setTimeout(() => {
+                        if (targetCardEl) targetCardEl.style.transition = '';
+                    }, 300);
+                }
+            }
+        } else {
+            // Check if the drop position would cause overlap
+            const wouldOverlap = checkCardOverlap(finalX, finalY, finalWidth, finalHeight, cardId);
+            
+            if (wouldOverlap) {
+                // Find nearest valid masonry position
+                const masonryPos = findNearestMasonryPosition(finalWidth, finalHeight, cardId);
+                draggedCardData.x = masonryPos.x;
+                draggedCardData.y = masonryPos.y;
+                
+                // Update visual position to match
+                draggedCard.style.left = masonryPos.x + 'px';
+                draggedCard.style.top = masonryPos.y + 'px';
+            } else {
+                // No overlap - keep exact position where dropped
+                draggedCardData.x = finalX;
+                draggedCardData.y = finalY;
+            }
+            
+            // Always save width and height
+            draggedCardData.width = finalWidth;
+            draggedCardData.height = finalHeight;
+        }
+        
+        // Mark as having exact position
+        draggedCardData.exactPosition = true;
+        
+        // Clean up
+        delete draggedCard.dataset.initialX;
+        delete draggedCard.dataset.initialY;
     }
     
+    // Reset dragged card styles - keep it at final position
+    draggedCard.classList.remove('dragging');
+    draggedCard.style.zIndex = '100';
+    draggedCard.style.opacity = '1';
+    draggedCard.style.transform = '';
+    draggedCard.style.transition = 'box-shadow 0.2s, transform 0.2s'; // Don't transition position
+    draggedCard.style.pointerEvents = '';
+    
+    // Hide drop indicator
+    hideDropIndicator();
+    
+    // Arrange all cards in masonry to ensure no overlaps
+    setTimeout(() => {
+        arrangeMasonryLayout();
+        saveCards();
+        updateCanvasHeight();
+    }, 50);
+    
+    dragOverCard = null;
     draggedCard = null;
     document.removeEventListener('mousemove', drag);
     document.removeEventListener('mouseup', stopDrag);
+}
+
+function startResize(cardId, e) {
+    e.stopPropagation();
+    resizingCard = document.querySelector(`[data-id="${cardId}"]`);
+    if (!resizingCard) return;
+    
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = card.width || parseInt(resizingCard.style.width);
+    const startHeight = card.height || parseInt(resizingCard.style.height);
+    
+    resizingCard.classList.add('resizing');
+    
+    function doResize(e) {
+        if (!resizingCard) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        const newWidth = Math.max(200, startWidth + deltaX);
+        const newHeight = Math.max(150, startHeight + deltaY);
+        
+        resizingCard.style.width = newWidth + 'px';
+        resizingCard.style.height = newHeight + 'px';
+        card.width = newWidth;
+        card.height = newHeight;
+    }
+    
+    function stopResize() {
+        if (resizingCard) {
+            const cardId = resizingCard.dataset.id;
+            const card = cards.find(c => c.id === cardId);
+            if (card) {
+                // Save EXACT position, width, and height after resize
+                card.x = parseInt(resizingCard.style.left) || card.x;
+                card.y = parseInt(resizingCard.style.top) || card.y;
+                card.width = parseInt(resizingCard.style.width) || card.width;
+                card.height = parseInt(resizingCard.style.height) || card.height;
+                card.exactPosition = true;
+                console.log('✅ Card resized - saved exact dimensions:', {
+                    id: card.id,
+                    x: card.x,
+                    y: card.y,
+                    width: card.width,
+                    height: card.height
+                });
+            }
+            resizingCard.classList.remove('resizing');
+            // Don't rearrange - keep exact position and size
+            saveCards();
+            updateCanvasHeight();
+        }
+        resizingCard = null;
+        document.removeEventListener('mousemove', doResize);
+        document.removeEventListener('mouseup', stopResize);
+    }
+    
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+}
+
+function arrangeMasonryLayout() {
+    if (cards.length === 0) return;
+    
+    // Don't rearrange if we're currently dragging
+    if (draggedCard) return;
+    
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+    
+    const canvasRect = canvas.getBoundingClientRect();
+    const canvasWidth = canvasRect.width || window.innerWidth;
+    const startX = masonryGap;
+    const startY = masonryGap;
+    
+    // Responsive: Calculate optimal column width based on screen size and card sizes
+    const minCardWidth = Math.min(...cards.map(card => card.width || getDefaultCardWidth(card.type)));
+    const maxCardWidth = Math.max(...cards.map(card => card.width || getDefaultCardWidth(card.type)));
+    
+    // For small screens, use fewer columns; for large screens, use more
+    let baseColumnWidth;
+    if (canvasWidth < 768) {
+        // Mobile: 1-2 columns
+        baseColumnWidth = Math.max(minCardWidth, canvasWidth - masonryGap * 2);
+    } else if (canvasWidth < 1024) {
+        // Tablet: 2-3 columns
+        baseColumnWidth = Math.max(minCardWidth, masonryColumnWidth);
+    } else {
+        // Desktop: multiple columns
+        baseColumnWidth = Math.max(minCardWidth, masonryColumnWidth);
+    }
+    
+    const numColumns = Math.max(1, Math.floor((canvasWidth - masonryGap * 2) / (baseColumnWidth + masonryGap)));
+    const actualColumnWidth = numColumns > 0 ? (canvasWidth - (numColumns + 1) * masonryGap) / numColumns : baseColumnWidth;
+    
+    // Track height of each column
+    const columnHeights = new Array(numColumns || 1).fill(startY);
+    
+    // Sort cards by their current position (top to bottom, left to right)
+    const sortedCards = [...cards].sort((a, b) => {
+        if (Math.abs(a.y - b.y) < 50) {
+            return a.x - b.x;
+        }
+        return a.y - b.y;
+    });
+    
+    // Place each card in masonry layout, checking for overlaps
+    sortedCards.forEach(card => {
+        const cardEl = document.querySelector(`[data-id="${card.id}"]`);
+        if (!cardEl || cardEl.classList.contains('dragging')) return;
+        
+        const cardWidth = card.width || getDefaultCardWidth(card.type);
+        const cardHeight = card.height || getDefaultCardHeight(card.type);
+        
+        // Check if current position has overlap or is outside responsive bounds
+        const hasOverlap = checkCardOverlap(card.x || 0, card.y || 0, cardWidth, cardHeight, card.id);
+        const isOutsideBounds = card.x + cardWidth > canvasWidth + masonryGap;
+        
+        let finalX, finalY;
+        
+        if (hasOverlap || isOutsideBounds || !card.exactPosition) {
+            // Find the shortest column for masonry placement
+            let shortestColumn = 0;
+            let shortestHeight = columnHeights[0];
+            for (let i = 1; i < columnHeights.length; i++) {
+                if (columnHeights[i] < shortestHeight) {
+                    shortestHeight = columnHeights[i];
+                    shortestColumn = i;
+                }
+            }
+            
+            // Calculate position in shortest column
+            finalX = startX + shortestColumn * (actualColumnWidth + masonryGap);
+            finalY = shortestHeight === startY ? startY : shortestHeight + masonryGap;
+            
+            // Update card data
+            card.x = finalX;
+            card.y = finalY;
+            card.exactPosition = true;
+            
+            // Update column height
+            columnHeights[shortestColumn] = finalY + cardHeight;
+        } else {
+            // No overlap, keep exact position but update column heights for other cards
+            finalX = card.x;
+            finalY = card.y;
+            
+            // Update column heights based on this card's position
+            const cardColumn = Math.floor((finalX - startX) / (actualColumnWidth + masonryGap));
+            const validColumn = Math.max(0, Math.min(numColumns - 1, cardColumn));
+            const cardBottom = finalY + cardHeight;
+            if (columnHeights[validColumn] < cardBottom) {
+                columnHeights[validColumn] = cardBottom;
+            }
+        }
+        
+        // Update visual position with smooth transition
+        cardEl.style.transition = 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        cardEl.style.left = finalX + 'px';
+        cardEl.style.top = finalY + 'px';
+        cardEl.style.width = cardWidth + 'px';
+        cardEl.style.height = cardHeight + 'px';
+    });
 }
 
 function updateCardContent(cardId, content) {
@@ -391,6 +900,7 @@ function deleteCard(cardId) {
     if (cardEl) {
         cardEl.remove();
     }
+    arrangeMasonryLayout();
     saveCards();
     updateCanvasHeight();
 }
@@ -428,10 +938,29 @@ function loadCards() {
             }
             
             cards.forEach(card => {
-                console.log('Rendering card:', card.type, 'at', card.x, card.y);
+                // Ensure width and height exist for old cards
+                if (!card.width) card.width = getDefaultCardWidth(card.type);
+                if (!card.height) card.height = getDefaultCardHeight(card.type);
+                // Mark as having exact position if x and y are set
+                if (card.x !== undefined && card.y !== undefined) {
+                    card.exactPosition = true;
+                }
+                console.log('Rendering card:', card.type, 'at', card.x, card.y, 'exactPosition:', card.exactPosition);
                 renderCard(card);
             });
-            updateCanvasHeight();
+            // Only arrange in masonry if cards don't have exact positions
+            const hasExactPositions = cards.some(card => card.exactPosition);
+            if (!hasExactPositions) {
+                setTimeout(() => {
+                    arrangeMasonryLayout();
+                    updateCanvasHeight();
+                }, 100);
+            } else {
+                // Just update canvas height for exact positions
+                setTimeout(() => {
+                    updateCanvasHeight();
+                }, 100);
+            }
             console.log('Cards rendered, total cards in DOM:', document.querySelectorAll('.card').length);
         } else {
             console.log('No cards found in storage');
@@ -465,12 +994,16 @@ async function syncStateToBackend() {
         console.log('🔄 Starting sync to backend for user:', currentUserId);
         showSyncStatus('saving');
         
+        // Sync tokens to backend
+        await syncTokensToBackend();
+        
         const state = {
             cards: cards,
             tasks: tasks,
             reminders: reminders,
             starredSites: await getStarredSites(),
-            rssFeeds: await getAllRssFeeds()
+            rssFeeds: await getAllRssFeeds(),
+            toggledSites: await loadToggledSites()
         };
         
         console.log('📤 Sending state to:', `${API_URL}/api/state/${currentUserId}`);
@@ -479,7 +1012,8 @@ async function syncStateToBackend() {
             tasks: tasks.length,
             reminders: reminders.length,
             starredSites: state.starredSites?.length || 0,
-            rssFeeds: Object.keys(state.rssFeeds || {}).length
+            rssFeeds: Object.keys(state.rssFeeds || {}).length,
+            toggledSites: state.toggledSites?.length || 0
         });
         
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`, {
@@ -506,10 +1040,59 @@ async function syncStateToBackend() {
     }
 }
 
+async function syncTokensToBackend() {
+    if (!currentUserId) return;
+    
+    try {
+        // Sync Mercury token
+        const mercuryData = await new Promise((resolve) => {
+            chrome.storage.local.get(['mercuryToken', 'mercuryConnected'], resolve);
+        });
+        if (mercuryData.mercuryToken && mercuryData.mercuryConnected) {
+            try {
+                await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: mercuryData.mercuryToken })
+                });
+                console.log('✅ Mercury token synced to backend');
+            } catch (error) {
+                console.error('❌ Failed to sync Mercury token:', error);
+            }
+        }
+        
+        // Sync Gmail token
+        const gmailData = await new Promise((resolve) => {
+            chrome.storage.local.get(['gmailToken', 'gmailConnected'], resolve);
+        });
+        if (gmailData.gmailToken && gmailData.gmailConnected) {
+            try {
+                await fetch(`${API_URL}/api/tokens/${currentUserId}/gmail`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: gmailData.gmailToken })
+                });
+                console.log('✅ Gmail token synced to backend');
+            } catch (error) {
+                console.error('❌ Failed to sync Gmail token:', error);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Token sync error:', error);
+    }
+}
+
 async function loadStateFromBackend() {
     if (!currentUserId) return;
     
     try {
+        // Load tokens from backend
+        await loadTokensFromBackend();
+        
         const response = await fetch(`${API_URL}/api/state/${currentUserId}`);
         const data = await response.json();
         
@@ -541,9 +1124,37 @@ async function loadStateFromBackend() {
                     chrome.storage.local.set({ [`rssFeeds_${cardId}`]: feeds });
                 }
             }
+            
+            if (data.state.toggledSites) {
+                chrome.storage.local.set({ toggledSites: data.state.toggledSites });
+            }
         }
     } catch (error) {
         console.error('Load state error:', error);
+    }
+}
+
+async function loadTokensFromBackend() {
+    if (!currentUserId) return;
+    
+    try {
+        // Load Mercury token
+        const mercuryResponse = await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`);
+        const mercuryData = await mercuryResponse.json();
+        if (mercuryData.token) {
+            chrome.storage.local.set({ mercuryToken: mercuryData.token, mercuryConnected: true });
+            console.log('✅ Mercury token loaded from backend');
+        }
+        
+        // Load Gmail token
+        const gmailResponse = await fetch(`${API_URL}/api/tokens/${currentUserId}/gmail`);
+        const gmailData = await gmailResponse.json();
+        if (gmailData.token) {
+            chrome.storage.local.set({ gmailToken: gmailData.token, gmailConnected: true });
+            console.log('✅ Gmail token loaded from backend');
+        }
+    } catch (error) {
+        console.error('❌ Failed to load tokens from backend:', error);
     }
 }
 
@@ -710,7 +1321,22 @@ function promptMercuryToken() {
         } else {
             const token = prompt('Enter your Mercury API token:');
             if (token && token.trim()) {
-                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, () => {
+                chrome.storage.local.set({ mercuryToken: token.trim(), mercuryConnected: true }, async () => {
+                    // Sync token to backend
+                    if (currentUserId) {
+                        try {
+                            await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ token: token.trim() })
+                            });
+                            console.log('✅ Mercury token synced to backend');
+                        } catch (error) {
+                            console.error('❌ Failed to sync Mercury token:', error);
+                        }
+                    }
                     createMercuryCard();
                 });
             }
@@ -790,7 +1416,18 @@ function renderMercuryCard(cardEl, cardId) {
                 <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
             `;
             const btn = content.querySelector('.connect-btn');
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
+                // Delete token from backend
+                if (currentUserId) {
+                    try {
+                        await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                            method: 'DELETE'
+                        });
+                        console.log('✅ Mercury token deleted from backend');
+                    } catch (error) {
+                        console.error('❌ Failed to delete Mercury token:', error);
+                    }
+                }
                 chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
                     deleteCard(cardId);
                     promptMercuryToken();
@@ -809,7 +1446,18 @@ function renderMercuryCard(cardEl, cardId) {
                 const updateBtn = content.querySelectorAll('.connect-btn')[0];
                 const retryBtn = content.querySelectorAll('.connect-btn')[1];
                 
-                updateBtn.addEventListener('click', () => {
+                updateBtn.addEventListener('click', async () => {
+                    // Delete token from backend
+                    if (currentUserId) {
+                        try {
+                            await fetch(`${API_URL}/api/tokens/${currentUserId}/mercury`, {
+                                method: 'DELETE'
+                            });
+                            console.log('✅ Mercury token deleted from backend');
+                        } catch (error) {
+                            console.error('❌ Failed to delete Mercury token:', error);
+                        }
+                    }
                     chrome.storage.local.remove(['mercuryToken', 'mercuryConnected'], () => {
                         deleteCard(cardId);
                         promptMercuryToken();
@@ -1008,7 +1656,22 @@ function authenticateGmail() {
             }
             
             if (token) {
-                chrome.storage.local.set({ gmailToken: token, gmailConnected: true }, () => {
+                chrome.storage.local.set({ gmailToken: token, gmailConnected: true }, async () => {
+                    // Sync token to backend
+                    if (currentUserId) {
+                        try {
+                            await fetch(`${API_URL}/api/tokens/${currentUserId}/gmail`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ token: token })
+                            });
+                            console.log('✅ Gmail token synced to backend');
+                        } catch (error) {
+                            console.error('❌ Failed to sync Gmail token:', error);
+                        }
+                    }
                     createGmailCard();
                 });
             } else {
@@ -1097,7 +1760,18 @@ function renderGmailCard(cardEl, cardId) {
                 <button class="connect-btn" style="margin-top: 12px;">Reconnect</button>
             `;
             const btn = content.querySelector('.connect-btn');
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
+                // Delete token from backend
+                if (currentUserId) {
+                    try {
+                        await fetch(`${API_URL}/api/tokens/${currentUserId}/gmail`, {
+                            method: 'DELETE'
+                        });
+                        console.log('✅ Gmail token deleted from backend');
+                    } catch (error) {
+                        console.error('❌ Failed to delete Gmail token:', error);
+                    }
+                }
                 chrome.storage.local.remove(['gmailToken', 'gmailConnected'], () => {
                     deleteCard(cardId);
                     authenticateGmail();
@@ -1116,7 +1790,18 @@ function renderGmailCard(cardEl, cardId) {
                 const reconnectBtn = content.querySelectorAll('.connect-btn')[0];
                 const retryBtn = content.querySelectorAll('.connect-btn')[1];
                 
-                reconnectBtn.addEventListener('click', () => {
+                reconnectBtn.addEventListener('click', async () => {
+                    // Delete token from backend
+                    if (currentUserId) {
+                        try {
+                            await fetch(`${API_URL}/api/tokens/${currentUserId}/gmail`, {
+                                method: 'DELETE'
+                            });
+                            console.log('✅ Gmail token deleted from backend');
+                        } catch (error) {
+                            console.error('❌ Failed to delete Gmail token:', error);
+                        }
+                    }
                     chrome.storage.local.remove(['gmailToken', 'gmailConnected'], () => {
                         deleteCard(cardId);
                         authenticateGmail();
@@ -2315,11 +3000,37 @@ async function checkAuthStatus() {
                 await createOrUpdateUser(userInfo);
             });
         } else {
-            console.error('❌ Chrome: Failed to get user info, removing token');
+            // Token might be expired, try to refresh it
+            console.log('🔄 Chrome: Token may be expired, attempting to refresh...');
             chrome.identity.removeCachedAuthToken({ token: token }, () => {
-                chrome.storage.local.remove(['userInfo', 'authToken'], () => {
-                    showUnauthenticatedView();
-                    currentUserId = null;
+                // Try to get a fresh token (non-interactive refresh)
+                chrome.identity.getAuthToken({ interactive: false }, async (newToken) => {
+                    if (chrome.runtime.lastError || !newToken) {
+                        console.error('❌ Chrome: Failed to refresh token, showing unauthenticated view');
+                        chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                            showUnauthenticatedView();
+                            currentUserId = null;
+                        });
+                        return;
+                    }
+                    
+                    // Try again with the new token
+                    console.log('🔄 Chrome: Got refreshed token, verifying...');
+                    const refreshedUserInfo = await getUserInfo(newToken);
+                    if (refreshedUserInfo) {
+                        console.log('✅ Chrome: Token refreshed successfully, userInfo:', refreshedUserInfo);
+                        chrome.storage.local.set({ userInfo: refreshedUserInfo, authToken: newToken }, async () => {
+                            showAuthenticatedView(refreshedUserInfo);
+                            updateAuthUI(refreshedUserInfo);
+                            await createOrUpdateUser(refreshedUserInfo);
+                        });
+                    } else {
+                        console.error('❌ Chrome: Refreshed token also invalid, showing unauthenticated view');
+                        chrome.storage.local.remove(['userInfo', 'authToken'], () => {
+                            showUnauthenticatedView();
+                            currentUserId = null;
+                        });
+                    }
                 });
             });
         }
@@ -2431,7 +3142,17 @@ function showUnauthenticatedView() {
     const bottomQuote = document.querySelector('.unauth-bottom-quote');
     if (bottomQuote) {
         bottomQuote.style.display = 'block';
+        bottomQuote.textContent = "The best thing is going to be a quote here to be best.";
     }
+    
+    // Hide buttons when unauthenticated
+    const leftBtn = document.getElementById('authBottomBtnLeft');
+    const rightBtn = document.getElementById('authBottomBtnRight');
+    if (leftBtn) leftBtn.style.display = 'none';
+    if (rightBtn) rightBtn.style.display = 'none';
+    
+    // Stop GMT time update
+    stopGMTTimeUpdate();
     
     document.body.classList.add('unauth-mode');
     updateUnauthenticatedUI();
@@ -2508,11 +3229,21 @@ function showAuthenticatedView(userInfo) {
         dotsSection.style.paddingBottom = '80px';
     }
     
-    // Show bottom quote (same as unauthenticated)
+    // Show bottom quote with authenticated message
     const bottomQuote = document.querySelector('.unauth-bottom-quote');
     if (bottomQuote) {
         bottomQuote.style.display = 'block';
+        bottomQuote.textContent = "Become the best version of yourself, the world is waiting.";
     }
+    
+    // Show buttons when authenticated
+    const leftBtn = document.getElementById('authBottomBtnLeft');
+    const rightBtn = document.getElementById('authBottomBtnRight');
+    if (leftBtn) leftBtn.style.display = 'flex';
+    if (rightBtn) rightBtn.style.display = 'flex';
+    
+    // Start updating GMT time
+    startGMTTimeUpdate();
     
     // Hide the auth-quote-text (we're using the bottom quote instead)
     const authQuoteText = document.querySelector('.auth-quote-text');
@@ -2953,6 +3684,47 @@ async function getUserInfo(token) {
     }
 }
 
+let gmtTimeInterval = null;
+
+function updateGMTTime() {
+    const gmtTimeElement = document.getElementById('gmtTime');
+    if (!gmtTimeElement) return;
+    
+    const now = new Date();
+    // Get GMT time by using UTC methods
+    let hours = now.getUTCHours();
+    const minutes = now.getUTCMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    
+    const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+    const hoursStr = hours < 10 ? '0' + hours : hours;
+    
+    gmtTimeElement.textContent = `${hoursStr}:${minutesStr} ${ampm}`;
+}
+
+function startGMTTimeUpdate() {
+    // Clear any existing interval
+    if (gmtTimeInterval) {
+        clearInterval(gmtTimeInterval);
+    }
+    
+    // Update immediately
+    updateGMTTime();
+    
+    // Update every second
+    gmtTimeInterval = setInterval(updateGMTTime, 1000);
+}
+
+function stopGMTTimeUpdate() {
+    if (gmtTimeInterval) {
+        clearInterval(gmtTimeInterval);
+        gmtTimeInterval = null;
+    }
+}
+
 function updateAuthUI(userInfo) {
     document.getElementById('signInBtn').style.display = 'none';
     document.getElementById('userProfile').style.display = 'flex';
@@ -2964,3 +3736,4 @@ function updateAuthUI(userInfo) {
         document.getElementById('userAvatar').style.display = 'none';
     }
 }
+
