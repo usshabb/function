@@ -1562,14 +1562,20 @@ body:not(.unauth-mode) .unauth-dots #canvas {
 }
 
 .unauth-bottom-quote-inner {
-  display: grid;
-  grid-template-columns: 153px 1fr 153px;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   width: 100%;
   max-width: 1800px;
   margin: 0 auto;
   box-sizing: border-box;
+}
+
+/* Grid layout only when authenticated */
+body:not(.unauth-mode) .unauth-bottom-quote-inner {
+  display: grid;
+  grid-template-columns: 153px 1fr 153px;
 }
 
 .unauth-bottom-quote {
@@ -1584,6 +1590,10 @@ body:not(.unauth-mode) .unauth-dots #canvas {
   color: rgba(5, 5, 5, 0.56);
   margin: 0;
   padding: 0;
+}
+
+/* Grid positioning only when authenticated */
+body:not(.unauth-mode) .unauth-bottom-quote {
   grid-column: 2;
   justify-self: center;
 }
