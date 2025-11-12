@@ -35,19 +35,8 @@ function promptMercuryToken() {
     });
 }
 
-async function createMercuryCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'mercury',
-        x: window.innerWidth / 2 - 200,
-        y: window.innerHeight / 2 - 150,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+function createMercuryCard() {
+    createCard('mercury', { content: '' });
 }
 
 async function fetchMercuryData(token) {

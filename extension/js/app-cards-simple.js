@@ -3,18 +3,7 @@
 // Dependencies: card-core.js, storage.js
 
 function createChatGPTCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'chatgpt',
-        x: window.innerWidth / 2 - 150,
-        y: window.innerHeight / 2 - 100,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('chatgpt', { content: '' });
 }
 
 function renderChatGPTCard(cardEl, cardId) {
@@ -48,18 +37,7 @@ function renderChatGPTCard(cardEl, cardId) {
 }
 
 function createGoogleSearchCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'google',
-        x: window.innerWidth / 2 - 150,
-        y: window.innerHeight / 2 - 50,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('google', { content: '' });
 }
 
 function renderGoogleSearchCard(cardEl, cardId) {

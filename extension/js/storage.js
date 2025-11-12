@@ -39,26 +39,17 @@ function loadCards() {
                 // Ensure width and height exist for old cards
                 if (!card.width) card.width = getDefaultCardWidth(card.type);
                 if (!card.height) card.height = getDefaultCardHeight(card.type);
-                // Mark as having exact position if x and y are set
-                if (card.x !== undefined && card.y !== undefined) {
-                    card.exactPosition = true;
-                }
+                // Reset exactPosition to force rearrangement with new 12px spacing
+                // This ensures all cards (including app cards) align properly
+                card.exactPosition = false;
                 console.log('Rendering card:', card.type, 'at', card.x, card.y, 'exactPosition:', card.exactPosition);
                 renderCard(card);
             });
-            // Only arrange in masonry if cards don't have exact positions
-            const hasExactPositions = cards.some(card => card.exactPosition);
-            if (!hasExactPositions) {
-                setTimeout(() => {
-                    arrangeMasonryLayout();
-                    updateCanvasHeight();
-                }, 100);
-            } else {
-                // Just update canvas height for exact positions
-                setTimeout(() => {
-                    updateCanvasHeight();
-                }, 100);
-            }
+            // Always arrange in masonry to ensure proper 12px spacing for all cards
+            setTimeout(() => {
+                arrangeMasonryLayout();
+                updateCanvasHeight();
+            }, 100);
             console.log('Cards rendered, total cards in DOM:', document.querySelectorAll('.card').length);
         } else {
             console.log('No cards found in storage');
@@ -209,8 +200,16 @@ async function loadStateFromBackend() {
                 State.setCards(data.state.cards);
                 chrome.storage.local.set({ cards: State.getCards() });
                 document.getElementById('canvas').innerHTML = '';
-                State.getCards().forEach(card => renderCard(card));
-                updateCanvasHeight();
+                // Reset exactPosition for all cards to ensure proper 12px spacing
+                State.getCards().forEach(card => {
+                    card.exactPosition = false;
+                    renderCard(card);
+                });
+                // Arrange all cards with proper 12px spacing
+                setTimeout(() => {
+                    arrangeMasonryLayout();
+                    updateCanvasHeight();
+                }, 100);
             }
             
             if (data.state.tasks) {

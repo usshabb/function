@@ -84,18 +84,7 @@ function authenticateGmail() {
 }
 
 function createGmailCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'gmail',
-        x: window.innerWidth / 2 - 200,
-        y: window.innerHeight / 2 - 150,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('gmail', { content: '' });
 }
 
 async function fetchGmailMessages(token) {
