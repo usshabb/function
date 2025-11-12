@@ -3,18 +3,7 @@
 // Dependencies: state.js, storage.js, card-core.js
 
 function createTasksCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'tasks',
-        x: window.innerWidth / 2 - 175,
-        y: window.innerHeight / 2 - 150,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('tasks', { content: '' });
 }
 
 function renderTasksCard(cardEl, cardId) {
@@ -164,18 +153,7 @@ function formatDate(dateString) {
 }
 
 function createReminderCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'reminder',
-        x: window.innerWidth / 2 - 175,
-        y: window.innerHeight / 2 - 150,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('reminder', { content: '' });
 }
 
 function renderReminderCard(cardEl, cardId) {

@@ -4,18 +4,7 @@
 
 // SSENSE Card
 function createSSENSECard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'ssense',
-        x: window.innerWidth / 2 - 250,
-        y: window.innerHeight / 2 - 200,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('ssense', { content: '' });
 }
 
 async function fetchSSENSEProducts() {
@@ -99,18 +88,7 @@ async function renderSSENSECard(cardEl, cardId) {
 
 // Weather Card
 function createWeatherCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'weather',
-        x: window.innerWidth / 2 - 150,
-        y: window.innerHeight / 2 - 100,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('weather', { content: '' });
 }
 
 async function fetchWeatherData(latitude, longitude) {
@@ -200,18 +178,7 @@ async function renderWeatherCard(cardEl, cardId) {
 
 // History Card
 function createHistoryCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'history',
-        x: window.innerWidth / 2 - 175,
-        y: window.innerHeight / 2 - 150,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('history', { content: '' });
 }
 
 function extractRootDomain(url) {
@@ -457,18 +424,7 @@ async function renderHistoryCard(cardEl, cardId) {
 
 // RSS Card
 function createRssCard() {
-    const card = {
-        id: Date.now().toString(),
-        type: 'rss',
-        x: window.innerWidth / 2 - 225,
-        y: window.innerHeight / 2 - 150,
-        content: ''
-    };
-    
-    State.getCards().push(card);
-    renderCard(card);
-    saveCards();
-    updateCanvasHeight();
+    createCard('rss', { content: '' });
 }
 
 async function fetchRssFeed(feedUrl) {

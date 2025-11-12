@@ -220,6 +220,7 @@ body {
   opacity: 1 !important;
   overflow: hidden;
   box-sizing: border-box;
+  margin: 0; /* Ensure no margins affect spacing - spacing is handled by position calculations */
 }
 
 .card:hover {
@@ -1611,7 +1612,7 @@ body:not(.unauth-mode) .unauth-bottom-quote {
 .auth-bottom-btn {
   background: rgba(255, 255, 255, 0.96);
   color: rgba(5, 5, 5, 0.56);
-  border: none;
+  border: 2px solid rgba(22, 22, 22, 0.08);
   border-radius: 12px;
   width: 153px;
   height: 36px;

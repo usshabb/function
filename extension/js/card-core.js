@@ -11,6 +11,9 @@ function getDefaultCardHeight(type) {
 }
 
 function createCard(type, data = {}) {
+    // If x/y are provided, use exact position; otherwise, let masonry arrange it
+    const hasExactPosition = data.x !== undefined && data.y !== undefined;
+    
     const card = {
         id: Date.now().toString(),
         type: type,
@@ -19,15 +22,13 @@ function createCard(type, data = {}) {
         width: data.width || getDefaultCardWidth(type),
         height: data.height || getDefaultCardHeight(type),
         content: data.content || '',
-        exactPosition: true // Flag to preserve exact position
+        exactPosition: hasExactPosition // Only true if x/y were explicitly provided
     };
     
     State.getCards().push(card);
     renderCard(card);
-    // Only arrange in masonry if no exact position was provided
-    if (!data.x && !data.y) {
-        arrangeMasonryLayout();
-    }
+    // Always arrange in masonry for new cards (they'll be placed at top-left)
+    arrangeMasonryLayout();
     saveCards();
     updateCanvasHeight();
 }
