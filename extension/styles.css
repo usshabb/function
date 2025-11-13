@@ -283,6 +283,18 @@ body {
   font-weight: 500;
 }
 
+/* Note card type specific styling */
+.card[data-type="note"] .card-type {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  letter-spacing: 0%;
+  vertical-align: middle;
+  color: rgba(5, 5, 5, 1);
+  text-transform: capitalize;
+}
+
 .delete-btn {
   background: transparent;
   border: none;
@@ -296,6 +308,40 @@ body {
 .delete-btn:hover {
   background: #f1f1ef;
   color: #37352f;
+}
+
+/* Note card delete button specific styling */
+.card[data-type="note"] .delete-btn {
+  padding: 4px;
+  margin: 0;
+  position: relative;
+  border: none;
+  background: transparent;
+  opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
+  overflow: visible;
+  z-index: 100;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.card[data-type="note"] .delete-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+}
+
+.card[data-type="note"] .delete-btn:hover {
+  opacity: 0.8;
 }
 
 .card-content {
@@ -315,12 +361,286 @@ body {
   resize: none;
   min-height: 60px;
   background: transparent;
+  overflow: hidden;
+}
+
+/* Note card textarea specific styling */
+.card[data-type="note"] .card-content {
+  height: auto;
+  overflow: visible;
+}
+
+.card[data-type="note"] .card-content textarea {
+  min-height: auto;
+  height: auto;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  color: rgba(5, 5, 5, 1);
 }
 
 .card-content textarea:focus {
   background: #f7f6f3;
   border-radius: 4px;
   padding: 4px;
+}
+
+/* Note card specific styling */
+.card[data-type="note"] {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  padding: 19px 24px;
+}
+
+/* Tasks card specific styling - matching note card */
+.card[data-type="tasks"] {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  padding: 19px 24px;
+}
+
+.card[data-type="tasks"] .card-type {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  letter-spacing: 0%;
+  vertical-align: middle;
+  color: rgba(5, 5, 5, 1);
+  text-transform: capitalize;
+}
+
+.card[data-type="tasks"] .delete-btn {
+  padding: 4px;
+  margin: 0;
+  position: relative;
+  border: none;
+  background: transparent;
+  opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
+  overflow: visible;
+  z-index: 100;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.card[data-type="tasks"] .delete-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+}
+
+.card[data-type="tasks"] .delete-btn:hover {
+  opacity: 0.8;
+}
+
+.card[data-type="tasks"] {
+  position: relative;
+  overflow: visible;
+}
+
+.card[data-type="tasks"] .card-content {
+  height: auto;
+  overflow: visible;
+  min-height: 0;
+}
+
+.card[data-type="tasks"] .resize-handle {
+  position: absolute !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  cursor: nwse-resize !important;
+  background: transparent !important;
+  z-index: 1000 !important;
+  display: block !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.card[data-type="tasks"] .card-content > div[id^="tasks-list-"] {
+  margin: 0;
+  padding: 0;
+}
+
+/* Todo list item styling */
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  margin-bottom: 14px;
+  position: relative;
+  min-height: 0;
+}
+
+.todo-item:last-child {
+  margin-bottom: 0;
+}
+
+.todo-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e3e2e0;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: all 0.2s;
+  background: transparent;
+  margin: 0;
+  z-index: 10;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todo-checkbox:hover {
+  border-color: #2383e2;
+}
+
+.todo-checkbox.completed {
+  background: rgba(17, 25, 254, 1);
+  border-color: rgba(17, 25, 254, 1);
+}
+
+.todo-checkbox.completed::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 6L9 17L4 12' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.todo-text {
+  flex: 1;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  color: rgba(5, 5, 5, 1);
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  border-radius: 4px;
+  min-width: 0;
+  resize: none;
+  overflow: hidden;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  display: block;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 0;
+  align-self: center;
+}
+
+.todo-text:focus {
+  background: #f7f6f3;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.todo-text.completed {
+  text-decoration: line-through;
+  color: #9b9a97;
+}
+
+.todo-delete-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 0;
+  z-index: 10;
+  pointer-events: auto;
+  position: relative;
+}
+
+.todo-item:hover .todo-delete-btn {
+  opacity: 1;
+}
+
+.todo-delete-btn:hover {
+  background: transparent;
+}
+
+.todo-delete-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: #d93025;
+  transition: stroke 0.2s;
+}
+
+.todo-delete-btn:hover svg {
+  stroke: #d93025;
+}
+
+.todo-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  color: rgba(5, 5, 5, 1);
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 0;
+}
+
+.todo-input:focus {
+  background: #f7f6f3;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.todo-input::placeholder {
+  color: #9b9a97;
+  opacity: 0.6;
+}
+
+.todo-hint {
+  font-size: 11px;
+  color: #9b9a97;
+  margin-top: 8px;
+  opacity: 0.7;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 400;
 }
 
 .link-input {

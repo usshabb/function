@@ -8,117 +8,252 @@ function createTasksCard() {
 
 function renderTasksCard(cardEl, cardId) {
     const content = cardEl.querySelector('.card-content');
+    const header = cardEl.querySelector('.card-header');
     
-    content.innerHTML = `
-        <div style="margin-bottom: 12px;">
-            <input type="text" id="task-input-${cardId}" placeholder="Add a new task..." style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
-            <input type="date" id="task-date-${cardId}" style="width: 100%; border: 1px solid #e3e2e0; border-radius: 6px; padding: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px;" />
-            <button class="connect-btn" id="add-task-${cardId}">Add Task</button>
-        </div>
-        <div id="tasks-list-${cardId}" style="max-height: 400px; overflow-y: auto;"></div>
-    `;
+    // Check if this is a new card (no tasks exist)
+    const tasks = State.getTasks();
+    const isNewCard = tasks.length === 0;
     
-    const input = content.querySelector(`#task-input-${cardId}`);
-    const dateInput = content.querySelector(`#task-date-${cardId}`);
-    const addBtn = content.querySelector(`#add-task-${cardId}`);
-    const tasksList = content.querySelector(`#tasks-list-${cardId}`);
-    
-    const addTask = () => {
-        const taskText = input.value.trim();
-        if (!taskText) return;
-        
-        const task = {
+    // If new card, create an initial empty task
+    if (isNewCard) {
+        const initialTask = {
             id: Date.now().toString(),
-            text: taskText,
-            dueDate: dateInput.value || null,
+            text: '',
+            dueDate: null,
             completed: false,
             createdAt: new Date().toISOString()
         };
-        
-        const tasks = State.getTasks();
-        tasks.unshift(task);
-        State.setTasks(tasks);
+        State.setTasks([initialTask]);
         saveTasks();
-        renderTasksList(tasksList);
+    }
+    
+    content.innerHTML = `
+        <div id="tasks-list-${cardId}"></div>
+        <div class="todo-hint">Press Enter to create new task</div>
+    `;
+    
+    const tasksList = content.querySelector(`#tasks-list-${cardId}`);
+    
+    // Auto-resize function for tasks card
+    const autoResizeCard = () => {
+        const headerHeight = header ? header.offsetHeight : 40;
+        const cardPadding = 38; // 19px top + 19px bottom
+        const contentHeight = content.scrollHeight;
+        const newHeight = Math.max(143, headerHeight + cardPadding + contentHeight);
         
-        input.value = '';
-        dateInput.value = '';
+        cardEl.style.height = newHeight + 'px';
+        const card = State.getCards().find(c => c.id === cardId);
+        if (card) {
+            card.height = newHeight;
+            saveCards();
+            updateCanvasHeight();
+        }
     };
     
-    addBtn.addEventListener('click', addTask);
-    input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            addTask();
-        }
-    });
-    
-    renderTasksList(tasksList);
+    renderTasksList(tasksList, cardEl, cardId);
+    // Initial resize
+    setTimeout(() => {
+        autoResizeCard();
+    }, 0);
 }
 
-function renderTasksList(container) {
+function renderTasksList(container, cardEl, cardId) {
     const tasks = State.getTasks();
-    if (tasks.length === 0) {
-        container.innerHTML = '<div style="color: #9b9a97; text-align: center; padding: 20px; font-size: 13px;">No tasks yet</div>';
-        return;
-    }
+    const header = cardEl ? cardEl.querySelector('.card-header') : null;
     
     container.innerHTML = '';
     
-    tasks.forEach(task => {
+    tasks.forEach((task, index) => {
         const taskEl = document.createElement('div');
-        taskEl.style.cssText = 'display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 6px; margin-bottom: 6px; background: #f7f6f3; transition: background 0.2s;';
-        taskEl.onmouseover = () => taskEl.style.background = '#edece9';
-        taskEl.onmouseout = () => taskEl.style.background = '#f7f6f3';
+        taskEl.className = 'todo-item';
         
+        // Circular checkbox - always unchecked by default for new tasks
         const checkbox = document.createElement('div');
-        checkbox.style.cssText = `width: 18px; height: 18px; border: 2px solid ${task.completed ? '#2383e2' : '#e3e2e0'}; border-radius: 4px; cursor: pointer; flex-shrink: 0; margin-top: 2px; background: ${task.completed ? '#2383e2' : 'transparent'}; position: relative; transition: all 0.2s;`;
+        checkbox.className = 'todo-checkbox';
         if (task.completed) {
-            checkbox.innerHTML = '<div style="color: white; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px;">✓</div>';
+            checkbox.classList.add('completed');
         }
-        checkbox.addEventListener('click', () => {
-            task.completed = !task.completed;
-            saveTasks();
-            renderTasksList(container);
+        checkbox.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
         });
         
-        const details = document.createElement('div');
-        details.style.cssText = 'flex: 1;';
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const tasks = State.getTasks();
+            const taskToUpdate = tasks.find(t => t.id === task.id);
+            if (taskToUpdate) {
+                taskToUpdate.completed = !taskToUpdate.completed;
+                State.setTasks(tasks);
+                saveTasks();
+                renderTasksList(container, cardEl, cardId);
+            }
+            return false;
+        });
         
-        const text = document.createElement('div');
-        text.style.cssText = `font-size: 14px; color: ${task.completed ? '#9b9a97' : '#37352f'}; margin-bottom: 4px; ${task.completed ? 'text-decoration: line-through;' : ''}`;
-        text.textContent = task.text;
-        details.appendChild(text);
-        
-        if (task.dueDate) {
-            const dueDate = document.createElement('div');
-            const dueDateObj = new Date(task.dueDate);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const isOverdue = dueDateObj < today && !task.completed;
-            
-            dueDate.style.cssText = `font-size: 12px; color: ${isOverdue ? '#d93025' : '#9b9a97'}; ${isOverdue ? 'font-weight: 500;' : ''}`;
-            dueDate.textContent = 'Due: ' + formatDate(task.dueDate);
-            details.appendChild(dueDate);
+        // Editable textarea (multi-line)
+        const textInput = document.createElement('textarea');
+        textInput.className = 'todo-text';
+        textInput.value = task.text;
+        textInput.rows = 1;
+        textInput.style.margin = '0';
+        textInput.style.padding = '0';
+        textInput.placeholder = '';
+        if (task.completed) {
+            textInput.classList.add('completed');
         }
+        
+        // Auto-resize textarea
+        const autoResizeTextarea = () => {
+            // Reset to get accurate scrollHeight - use a minimal height
+            textInput.style.height = 'auto';
+            textInput.style.minHeight = '0';
+            // Force reflow
+            void textInput.offsetHeight;
+            // Get the actual content height
+            const scrollHeight = textInput.scrollHeight;
+            // Only set height if there's content, otherwise use minimal height
+            if (scrollHeight > 0) {
+                textInput.style.height = scrollHeight + 'px';
+            } else {
+                // For empty textarea, use line-height based height
+                const computedStyle = window.getComputedStyle(textInput);
+                const lineHeight = parseFloat(computedStyle.lineHeight) || 20;
+                textInput.style.height = lineHeight + 'px';
+            }
+            if (cardEl) {
+                const headerHeight = header ? header.offsetHeight : 40;
+                const cardPadding = 38;
+                const content = cardEl.querySelector('.card-content');
+                const contentHeight = content.scrollHeight;
+                const newHeight = Math.max(143, headerHeight + cardPadding + contentHeight);
+                cardEl.style.height = newHeight + 'px';
+                const card = State.getCards().find(c => c.id === cardId);
+                if (card) {
+                    card.height = newHeight;
+                    saveCards();
+                    updateCanvasHeight();
+                }
+            }
+        };
+        
+        textInput.addEventListener('input', () => {
+            const tasks = State.getTasks();
+            const taskToUpdate = tasks.find(t => t.id === task.id);
+            if (taskToUpdate) {
+                taskToUpdate.text = textInput.value;
+                saveTasks();
+            }
+            // Update delete button visibility for first row
+            const isEmpty = !textInput.value || textInput.value.trim() === '';
+            const isFirstRow = index === 0;
+            if (isFirstRow && isEmpty) {
+                deleteBtn.style.display = 'none';
+            } else {
+                deleteBtn.style.display = '';
+            }
+            autoResizeTextarea();
+        });
+        
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                textInput.blur();
+                // Create new task below with checkbox and placeholder
+                const tasks = State.getTasks();
+                const currentIndex = tasks.findIndex(t => t.id === task.id);
+                const newTask = {
+                    id: Date.now().toString(),
+                    text: '',
+                    dueDate: null,
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                };
+                tasks.splice(currentIndex + 1, 0, newTask);
+                State.setTasks(tasks);
+                saveTasks();
+                renderTasksList(container, cardEl, cardId);
+                // Focus the new task input
+                setTimeout(() => {
+                    const newTaskEl = container.querySelector(`[data-task-id="${newTask.id}"]`);
+                    if (newTaskEl) {
+                        const newInput = newTaskEl.querySelector('.todo-text');
+                        if (newInput) {
+                            newInput.placeholder = '';
+                            newInput.focus();
+                        }
+                    }
+                }, 0);
+            } else if (e.key === 'Escape') {
+                textInput.blur();
+            }
+        });
+        
+        // Initial resize
+        setTimeout(() => {
+            autoResizeTextarea();
+        }, 0);
+        
+        // Delete button (well-designed dustbin icon) - shows on hover
+        // Hide delete button if it's the first row and empty
+        const isFirstRow = index === 0;
+        const isEmpty = !task.text || task.text.trim() === '';
+        const shouldHideDelete = isFirstRow && isEmpty;
         
         const deleteBtn = document.createElement('button');
-        deleteBtn.style.cssText = 'background: transparent; border: none; color: #9b9a97; cursor: pointer; font-size: 18px; padding: 0 4px; flex-shrink: 0; transition: color 0.2s;';
-        deleteBtn.textContent = '×';
-        deleteBtn.onmouseover = () => deleteBtn.style.color = '#d93025';
-        deleteBtn.onmouseout = () => deleteBtn.style.color = '#9b9a97';
-        deleteBtn.addEventListener('click', () => {
-            const tasks = State.getTasks();
-            State.setTasks(tasks.filter(t => t.id !== task.id));
-            saveTasks();
-            renderTasksList(container);
+        deleteBtn.className = 'todo-delete-btn';
+        if (shouldHideDelete) {
+            deleteBtn.style.display = 'none';
+        }
+        deleteBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 11V17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 11V17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
+        deleteBtn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
         });
         
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const tasks = State.getTasks();
+            const filteredTasks = tasks.filter(t => t.id !== task.id);
+            State.setTasks(filteredTasks);
+            saveTasks();
+            renderTasksList(container, cardEl, cardId);
+            return false;
+        });
+        
+        taskEl.setAttribute('data-task-id', task.id);
         taskEl.appendChild(checkbox);
-        taskEl.appendChild(details);
+        taskEl.appendChild(textInput);
         taskEl.appendChild(deleteBtn);
         
         container.appendChild(taskEl);
     });
+    
+    // Resize card after rendering
+    if (cardEl) {
+        setTimeout(() => {
+            const headerHeight = header ? header.offsetHeight : 40;
+            const cardPadding = 38;
+            const content = cardEl.querySelector('.card-content');
+            const contentHeight = content.scrollHeight;
+            const newHeight = Math.max(143, headerHeight + cardPadding + contentHeight);
+            cardEl.style.height = newHeight + 'px';
+            const card = State.getCards().find(c => c.id === cardId);
+            if (card) {
+                card.height = newHeight;
+                saveCards();
+                updateCanvasHeight();
+            }
+        }, 0);
+    }
 }
 
 function loadTasks() {

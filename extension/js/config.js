@@ -21,7 +21,7 @@ console.log('🌐 Is Chrome Extension:', isChromeExtension());
 var DEFAULT_CARD_WIDTHS = {
     'mercury': 350,
     'gmail': 400,
-    'tasks': 350,
+    'tasks': 300,
     'reminder': 350,
     'ssense': 500,
     'weather': 300,
@@ -36,13 +36,13 @@ var DEFAULT_CARD_WIDTHS = {
 var DEFAULT_CARD_HEIGHTS = {
     'mercury': 400,
     'gmail': 500,
-    'tasks': 300,
+    'tasks': 143,
     'reminder': 200,
     'ssense': 600,
     'weather': 250,
     'history': 500,
     'rss': 600,
-    'note': 200,
+    'note': 143,
     'link': 150,
     'chatgpt': 500,
     'google': 300
