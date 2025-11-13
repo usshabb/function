@@ -195,9 +195,13 @@ function arrangeMasonryLayout() {
     const canvasWidth = canvasRect.width || window.innerWidth;
     const gap = MASONRY_GAP; // 12px spacing
     
-    // Sort cards: NEWEST FIRST (by ID descending, since ID = Date.now())
-    // This ensures newly added cards appear at the top-left
+    // Sort cards: exactPosition cards first (to preserve their positions), then newest first
+    // This ensures manually positioned cards are placed before others
     const sortedCards = [...cards].sort((a, b) => {
+        // Cards with exactPosition come first
+        if (a.exactPosition && !b.exactPosition) return -1;
+        if (!a.exactPosition && b.exactPosition) return 1;
+        // For cards with same exactPosition status, sort by ID (newest first)
         const idA = parseInt(a.id) || 0;
         const idB = parseInt(b.id) || 0;
         return idB - idA; // Descending: newest first
@@ -216,82 +220,34 @@ function arrangeMasonryLayout() {
         
         let finalX, finalY;
         
-        // Check if current position is valid (exactly 12px spacing from all placed cards)
+        // Check if current position is valid
         let isValidPosition = true;
         if (card.x !== undefined && card.y !== undefined && card.exactPosition) {
-            // Verify current position has exactly 12px spacing
+            // For cards with exactPosition, only check for actual overlaps (not spacing requirements)
+            // This preserves user's manual positioning
             for (const placed of placedCards) {
                 const placedX = placed.x || 0;
                 const placedY = placed.y || 0;
                 const placedWidth = placed.width || 0;
                 const placedHeight = placed.height || 0;
                 
-                // Check if cards overlap or are adjacent (considering 12px gap requirement)
-                const hOverlap = !(card.x + cardWidth + gap <= placedX || card.x >= placedX + placedWidth + gap);
-                const vOverlap = !(card.y + cardHeight + gap <= placedY || card.y >= placedY + placedHeight + gap);
+                // Check if cards actually overlap (not just spacing)
+                const hOverlap = !(card.x + cardWidth <= placedX || card.x >= placedX + placedWidth);
+                const vOverlap = !(card.y + cardHeight <= placedY || card.y >= placedY + placedHeight);
                 
-                if (hOverlap || vOverlap) {
-                    // Calculate actual gaps
-                    let hGap = 0;
-                    let vGap = 0;
-                    
-                    // Horizontal gap: distance between card edges
-                    if (card.x + cardWidth <= placedX) {
-                        hGap = placedX - (card.x + cardWidth);
-                    } else if (placedX + placedWidth <= card.x) {
-                        hGap = card.x - (placedX + placedWidth);
-                    } else {
-                        hGap = 0; // Cards overlap horizontally
-                    }
-                    
-                    // Vertical gap: distance between card edges
-                    if (card.y + cardHeight <= placedY) {
-                        vGap = placedY - (card.y + cardHeight);
-                    } else if (placedY + placedHeight <= card.y) {
-                        vGap = card.y - (placedY + placedHeight);
-                    } else {
-                        vGap = 0; // Cards overlap vertically
-                    }
-                    
-                    // If cards overlap in both dimensions, position is invalid
-                    if (hGap === 0 && vGap === 0) {
-                        isValidPosition = false;
-                        break;
-                    }
-                    
-                    // If cards are horizontally adjacent (vertically overlapping, horizontally separated)
-                    // Vertical gap must be exactly 12px
-                    if (vOverlap && !hOverlap && vGap > 0 && Math.abs(vGap - gap) > 0.5) {
-                        isValidPosition = false;
-                        break;
-                    }
-                    
-                    // If cards are vertically adjacent (horizontally overlapping, vertically separated)
-                    // Horizontal gap must be exactly 12px
-                    if (hOverlap && !vOverlap && hGap > 0 && Math.abs(hGap - gap) > 0.5) {
-                        isValidPosition = false;
-                        break;
-                    }
-                    
-                    // If cards overlap in both dimensions but have gaps, check if gaps are exactly 12px
+                // Only invalidate if cards actually overlap in both dimensions
                     if (hOverlap && vOverlap) {
-                        if (hGap > 0 && Math.abs(hGap - gap) > 0.5) {
                             isValidPosition = false;
                             break;
-                        }
-                        if (vGap > 0 && Math.abs(vGap - gap) > 0.5) {
-                            isValidPosition = false;
-                            break;
-                        }
-                    }
                 }
             }
             
-            // Also check if position is within bounds
-            if (card.x + cardWidth > canvasWidth - gap) {
+            // Also check if position is way outside bounds (allow some margin)
+            if (card.x + cardWidth > canvasWidth + 100 || card.x < -100 || card.y < -100) {
                 isValidPosition = false;
             }
         } else {
+            // For cards without exactPosition, check for exactly 12px spacing
             isValidPosition = false;
         }
         

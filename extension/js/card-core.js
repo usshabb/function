@@ -37,6 +37,7 @@ function renderCard(card) {
     const cardEl = document.createElement('div');
     cardEl.className = 'card';
     cardEl.dataset.id = card.id;
+    cardEl.dataset.type = card.type;
     cardEl.style.left = card.x + 'px';
     cardEl.style.top = card.y + 'px';
     cardEl.style.width = (card.width || getDefaultCardWidth(card.type)) + 'px';
@@ -47,14 +48,48 @@ function renderCard(card) {
     
     const type = document.createElement('div');
     type.className = 'card-type';
-    type.textContent = card.type;
+    // Special handling for tasks card
+    if (card.type === 'tasks') {
+        type.textContent = 'To Do List';
+    } else {
+        // Capitalize first letter for display
+        type.textContent = card.type.charAt(0).toUpperCase() + card.type.slice(1);
+    }
     
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
-    deleteBtn.textContent = '×';
+    
+    // Use SVG for note and tasks cards, text for others
+    if (card.type === 'note' || card.type === 'tasks') {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '20');
+        svg.setAttribute('height', '20');
+        svg.setAttribute('viewBox', '0 0 20 20');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M14.1668 5.83325L5.8335 14.1666M5.8335 5.83325L14.1668 14.1666');
+        path.setAttribute('stroke', 'black');
+        path.setAttribute('stroke-width', '1.66667');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        
+        svg.appendChild(path);
+        deleteBtn.appendChild(svg);
+    } else {
+        deleteBtn.textContent = '×';
+    }
+    
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         deleteCard(card.id);
+    });
+    
+    deleteBtn.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
     });
     
     header.appendChild(type);
@@ -68,10 +103,36 @@ function renderCard(card) {
         const textarea = document.createElement('textarea');
         textarea.value = card.content;
         textarea.placeholder = 'Start typing...';
+        
+        // Auto-resize function for note cards
+        const autoResize = () => {
+            // Reset height to auto to get the correct scrollHeight
+            textarea.style.height = 'auto';
+            
+            // Calculate required height: header (~40px) + padding (38px) + textarea content
+            const headerHeight = header.offsetHeight || 40;
+            const cardPadding = 38; // 19px top + 19px bottom
+            const textareaHeight = textarea.scrollHeight;
+            const newHeight = Math.max(143, headerHeight + cardPadding + textareaHeight);
+            
+            // Update card height
+            cardEl.style.height = newHeight + 'px';
+            card.height = newHeight;
+            saveCards();
+            updateCanvasHeight();
+        };
+        
         textarea.addEventListener('input', (e) => {
             updateCardContent(card.id, e.target.value);
+            autoResize();
         });
+        
         content.appendChild(textarea);
+        
+        // Initial resize if there's existing content
+        if (card.content) {
+            setTimeout(autoResize, 0);
+        }
     } else if (card.type === 'link') {
         if (card.content) {
             try {
@@ -98,8 +159,6 @@ function renderCard(card) {
         cardEl.style.cursor = 'default';
     } else if (card.type === 'google') {
         cardEl.style.cursor = 'default';
-    } else if (card.type === 'tasks') {
-        cardEl.style.cursor = 'default';
     } else if (card.type === 'reminder') {
         cardEl.style.cursor = 'default';
     }
@@ -109,7 +168,7 @@ function renderCard(card) {
     // Add resize handle
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'resize-handle';
-    resizeHandle.style.cssText = 'position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; cursor: nwse-resize; background: transparent; z-index: 10;';
+    resizeHandle.style.cssText = 'position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; cursor: nwse-resize; background: transparent; z-index: 1000; pointer-events: auto;';
     cardEl.appendChild(resizeHandle);
     
     resizeHandle.addEventListener('mousedown', (e) => {
@@ -211,18 +270,28 @@ function updateCardContent(cardId, content) {
 
 function deleteCard(cardId) {
     const cards = State.getCards();
+    const cardToDelete = cards.find(c => c.id === cardId);
+    
+    // If deleting a tasks card, also delete all tasks
+    if (cardToDelete && cardToDelete.type === 'tasks') {
+        State.setTasks([]);
+        // Save tasks directly to storage
+        chrome.storage.local.set({ tasks: [] }, () => {
+            if (typeof debouncedSync === 'function') {
+                debouncedSync();
+            }
+        });
+    }
+    
     State.setCards(cards.filter(c => c.id !== cardId));
     const cardEl = document.querySelector(`[data-id="${cardId}"]`);
     if (cardEl) {
         cardEl.remove();
     }
     
-    // Reset exactPosition on all remaining cards to force rearrangement
-    State.getCards().forEach(card => {
-        card.exactPosition = false;
-    });
-    
-    // Rearrange cards to fill the gap, similar to when adding a card
+    // Don't reset exactPosition - preserve manually positioned cards
+    // Only rearrange cards that don't have exactPosition set
+    // This keeps user's manual positioning intact
     arrangeMasonryLayout();
     saveCards();
     updateCanvasHeight();

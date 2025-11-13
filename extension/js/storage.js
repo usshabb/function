@@ -39,13 +39,15 @@ function loadCards() {
                 // Ensure width and height exist for old cards
                 if (!card.width) card.width = getDefaultCardWidth(card.type);
                 if (!card.height) card.height = getDefaultCardHeight(card.type);
-                // Reset exactPosition to force rearrangement with new 12px spacing
-                // This ensures all cards (including app cards) align properly
-                card.exactPosition = false;
+                // Preserve exactPosition if it exists, otherwise default to false for new cards
+                // This ensures manually positioned cards keep their positions after refresh
+                if (card.exactPosition === undefined) {
+                    card.exactPosition = false;
+                }
                 console.log('Rendering card:', card.type, 'at', card.x, card.y, 'exactPosition:', card.exactPosition);
                 renderCard(card);
             });
-            // Always arrange in masonry to ensure proper 12px spacing for all cards
+            // Arrange in masonry - this will respect exactPosition flags
             setTimeout(() => {
                 arrangeMasonryLayout();
                 updateCanvasHeight();
@@ -200,12 +202,18 @@ async function loadStateFromBackend() {
                 State.setCards(data.state.cards);
                 chrome.storage.local.set({ cards: State.getCards() });
                 document.getElementById('canvas').innerHTML = '';
-                // Reset exactPosition for all cards to ensure proper 12px spacing
+                // Preserve exactPosition flags - don't reset them
                 State.getCards().forEach(card => {
-                    card.exactPosition = false;
+                    // Ensure width and height exist for old cards
+                    if (!card.width) card.width = getDefaultCardWidth(card.type);
+                    if (!card.height) card.height = getDefaultCardHeight(card.type);
+                    // Preserve exactPosition if it exists, otherwise default to false
+                    if (card.exactPosition === undefined) {
+                        card.exactPosition = false;
+                    }
                     renderCard(card);
                 });
-                // Arrange all cards with proper 12px spacing
+                // Arrange cards - this will respect exactPosition flags
                 setTimeout(() => {
                     arrangeMasonryLayout();
                     updateCanvasHeight();
