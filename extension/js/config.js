@@ -37,7 +37,7 @@ var DEFAULT_CARD_HEIGHTS = {
     'mercury': 400,
     'gmail': 500,
     'tasks': 143,
-    'reminder': 200,
+    'reminder': 370,
     'ssense': 600,
     'weather': 250,
     'history': 500,

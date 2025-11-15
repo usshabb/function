@@ -4,7 +4,10 @@
 
 function saveCards() {
     chrome.storage.local.set({ cards: State.getCards() });
-    debouncedSync();
+    // Only sync if user is authenticated
+    if (State.getCurrentUserId()) {
+        debouncedSync();
+    }
 }
 
 function loadCards() {
@@ -47,8 +50,9 @@ function loadCards() {
                 console.log('Rendering card:', card.type, 'at', card.x, card.y, 'exactPosition:', card.exactPosition);
                 renderCard(card);
             });
-            // Arrange in masonry - this will respect exactPosition flags
+            // Arrange in masonry and fix any overlaps - this will respect exactPosition flags
             setTimeout(() => {
+                fixAllOverlaps();
                 arrangeMasonryLayout();
                 updateCanvasHeight();
             }, 100);
@@ -123,7 +127,15 @@ async function syncStateToBackend() {
             body: JSON.stringify({ state })
         });
         
-        const responseData = await response.json();
+        let responseData;
+        try {
+            const text = await response.text();
+            responseData = text ? JSON.parse(text) : {};
+        } catch (parseError) {
+            console.error('❌ Failed to parse response as JSON:', parseError);
+            responseData = { error: 'Invalid response format' };
+        }
+        
         console.log('📥 Server response:', response.status, responseData);
         
         if (response.ok) {
@@ -181,6 +193,25 @@ async function syncTokensToBackend() {
                 console.error('❌ Failed to sync Gmail token:', error);
             }
         }
+        
+        // Sync Google Calendar token
+        const calendarData = await new Promise((resolve) => {
+            chrome.storage.local.get(['calendarToken', 'calendarConnected'], resolve);
+        });
+        if (calendarData.calendarToken && calendarData.calendarConnected) {
+            try {
+                await fetch(`${API_URL}/api/tokens/${currentUserId}/calendar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: calendarData.calendarToken })
+                });
+                console.log('✅ Google Calendar token synced to backend');
+            } catch (error) {
+                console.error('❌ Failed to sync Google Calendar token:', error);
+            }
+        }
     } catch (error) {
         console.error('❌ Token sync error:', error);
     }
@@ -213,8 +244,9 @@ async function loadStateFromBackend() {
                     }
                     renderCard(card);
                 });
-                // Arrange cards - this will respect exactPosition flags
+                // Arrange cards and fix any overlaps - this will respect exactPosition flags
                 setTimeout(() => {
+                    fixAllOverlaps();
                     arrangeMasonryLayout();
                     updateCanvasHeight();
                 }, 100);
@@ -268,6 +300,23 @@ async function loadTokensFromBackend() {
         if (gmailData.token) {
             chrome.storage.local.set({ gmailToken: gmailData.token, gmailConnected: true });
             console.log('✅ Gmail token loaded from backend');
+        }
+        
+        // Load Google Calendar token
+        const calendarResponse = await fetch(`${API_URL}/api/tokens/${currentUserId}/calendar`);
+        const calendarData = await calendarResponse.json();
+        if (calendarData.token) {
+            chrome.storage.local.set({ calendarToken: calendarData.token, calendarConnected: true }, () => {
+                console.log('✅ Google Calendar token loaded from backend');
+                // Refresh any reminder cards that are already rendered
+                const reminderCards = document.querySelectorAll('[data-type="reminder"]');
+                reminderCards.forEach(cardEl => {
+                    const cardId = cardEl.dataset.id;
+                    if (typeof renderReminderCard === 'function') {
+                        renderReminderCard(cardEl, cardId);
+                    }
+                });
+            });
         }
     } catch (error) {
         console.error('❌ Failed to load tokens from backend:', error);
@@ -358,43 +407,79 @@ async function loadToggledSites() {
 }
 
 function showSyncStatus(status) {
-    const toolbar = document.querySelector('.toolbar');
-    if (!toolbar) {
-        console.warn('⚠️ Toolbar not found, cannot show sync status');
-        return;
+    // Get or create the sync status modal
+    let syncModal = document.getElementById('syncStatusModal');
+    if (!syncModal) {
+        syncModal = document.createElement('div');
+        syncModal.id = 'syncStatusModal';
+        syncModal.className = 'sync-status-modal';
+        document.body.appendChild(syncModal);
     }
     
-    let syncIndicator = document.getElementById('syncIndicator');
-    if (!syncIndicator) {
-        syncIndicator = document.createElement('div');
-        syncIndicator.id = 'syncIndicator';
-        syncIndicator.style.cssText = 'margin-left: 10px; padding: 4px 8px; border-radius: 4px; font-size: 12px; transition: opacity 0.3s;';
-        toolbar.appendChild(syncIndicator);
+    // Create the modal content structure
+    let modalContent = syncModal.querySelector('.refresh-cw-02-parent');
+    if (!modalContent) {
+        modalContent = document.createElement('div');
+        modalContent.className = 'refresh-cw-02-parent';
+        syncModal.appendChild(modalContent);
     }
     
-    syncIndicator.className = `sync-indicator ${status}`;
+    // Create or get icon
+    let icon = modalContent.querySelector('.refresh-cw-02-icon');
+    if (!icon) {
+        icon = document.createElement('img');
+        icon.className = 'refresh-cw-02-icon';
+        icon.src = 'assets/refresh-cw-02.svg';
+        icon.alt = '';
+        modalContent.insertBefore(icon, modalContent.firstChild);
+    }
     
+    // Create or get text element
+    let textElement = modalContent.querySelector('.saving');
+    if (!textElement) {
+        textElement = document.createElement('div');
+        textElement.className = 'saving';
+        modalContent.appendChild(textElement);
+    }
+    
+    // Update content based on status
     if (status === 'saving') {
-        syncIndicator.textContent = '↻ Saving...';
-        syncIndicator.style.color = '#666';
-        syncIndicator.style.backgroundColor = '#f0f0f0';
-    } else if (status === 'saved') {
-        syncIndicator.textContent = '✓ Saved';
-        syncIndicator.style.color = '#4caf50';
-        syncIndicator.style.backgroundColor = '#e8f5e9';
+        textElement.textContent = 'Saving...';
+        icon.src = 'assets/refresh-cw-02.svg';
+        icon.classList.add('rotating');
+        // Show modal with animation
+        syncModal.style.display = 'block';
         setTimeout(() => {
-            syncIndicator.style.opacity = '0';
+            syncModal.classList.add('show');
+        }, 10);
+    } else if (status === 'saved') {
+        textElement.textContent = 'Saved';
+        icon.src = 'assets/checkmark.svg';
+        icon.classList.remove('rotating');
+        syncModal.style.display = 'block';
+        syncModal.classList.add('show');
+        // Hide after 2 seconds
+        setTimeout(() => {
+            syncModal.classList.remove('show');
+            setTimeout(() => {
+                syncModal.style.display = 'none';
+            }, 300); // Wait for animation to complete
         }, 2000);
     } else if (status === 'error') {
-        syncIndicator.textContent = '✗ Sync error';
-        syncIndicator.style.color = '#f44336';
-        syncIndicator.style.backgroundColor = '#ffebee';
+        textElement.textContent = 'Error';
+        icon.src = 'assets/refresh-cw-02.svg';
+        icon.classList.remove('rotating');
+        syncModal.style.display = 'block';
+        syncModal.classList.add('show');
+        // Hide after 3 seconds
         setTimeout(() => {
-            syncIndicator.style.opacity = '0';
+            syncModal.classList.remove('show');
+            setTimeout(() => {
+                syncModal.style.display = 'none';
+            }, 300);
         }, 3000);
     }
     
-    syncIndicator.style.opacity = '1';
     console.log(`📊 Sync status: ${status}`);
 }
 

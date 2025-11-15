@@ -15,18 +15,31 @@
   "host_permissions": [
     "http://localhost:3000/*",
     "https://api.mercury.com/*",
-    "https://www.googleapis.com/*"
+    "https://www.googleapis.com/*",
+    "https://api.open-meteo.com/*",
+    "https://ssense-scrape-ushabbir.replit.app/*",
+    "https://api.cors.lol/*",
+    "https://www.google.com/*"
   ],
   "oauth2": {
     "client_id": "684137663267-9rjfe824on6g5o8bdu4miequ309mb15t.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile"
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/calendar.readonly"
     ]
   },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*.svg"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

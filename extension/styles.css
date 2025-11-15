@@ -213,7 +213,7 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   padding: 16px;
   min-width: 200px;
-  cursor: move;
+  cursor: default;
   transition: box-shadow 0.2s, transform 0.2s;
   z-index: 100;
   visibility: visible !important;
@@ -269,6 +269,18 @@ body {
   border-color: transparent transparent #37352f transparent;
 }
 
+.card-drag-handle {
+  cursor: move;
+  user-select: none;
+  padding-top: 8px;
+  margin-top: -8px;
+  margin-bottom: 0;
+}
+
+.card.dragging .card-drag-handle {
+  cursor: move;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -299,7 +311,7 @@ body {
   background: transparent;
   border: none;
   color: #9b9a97;
-  cursor: pointer;
+  cursor: pointer !important;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 14px;
@@ -445,6 +457,101 @@ body {
 .card[data-type="tasks"] {
   position: relative;
   overflow: visible;
+}
+
+/* Reminder card specific styling - matching note card */
+.card[data-type="reminder"] {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  padding: 19px 24px;
+}
+
+.card[data-type="reminder"] .card-type {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 120%;
+  letter-spacing: 0%;
+  vertical-align: middle;
+  color: rgba(5, 5, 5, 1);
+  text-transform: capitalize;
+}
+
+.card[data-type="reminder"] .delete-btn {
+  padding: 4px;
+  margin: 0;
+  position: relative;
+  border: none;
+  background: transparent;
+  opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
+  overflow: visible;
+  z-index: 100;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.card[data-type="reminder"] .delete-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+}
+
+.card[data-type="reminder"] .delete-btn:hover {
+  opacity: 0.8;
+}
+
+/* Reminder card content - flex column layout */
+.card[data-type="reminder"] .card-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 40px);
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Calendar events scrollable container */
+.calendar-events-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+/* Custom scrollbar design for calendar events */
+.calendar-events-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-events-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.calendar-events-scrollable::-webkit-scrollbar-thumb {
+  background: rgba(155, 154, 151, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.calendar-events-scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(155, 154, 151, 0.5);
+}
+
+/* Firefox scrollbar */
+.calendar-events-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 154, 151, 0.3) transparent;
 }
 
 .card[data-type="tasks"] .card-content {
@@ -1620,6 +1727,7 @@ body:not(.unauth-mode) .unauth-greeting {
   background: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding-right: 12px;
+  position: relative;
 }
 
 .unauth-search-input {
@@ -1668,6 +1776,97 @@ body:not(.unauth-mode) .unauth-greeting {
 
 .unauth-model-btn svg {
   flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.unauth-model-btn svg.chevron-open {
+  transform: rotate(180deg);
+}
+
+.unauth-model-btn img,
+.ai-model-btn-logo {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.ai-model-btn-logo-clickable {
+  cursor: pointer;
+}
+
+/* AI Model Modal */
+.ai-model-modal {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 12px;
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.ai-model-modal:not(.ai-model-modal-hidden) {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.ai-model-modal-hidden {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+.ai-model-dropdown {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 240px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-model-content {
+  padding: 12px;
+}
+
+.ai-model-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background 0.2s, border-radius 0.2s;
+}
+
+.ai-model-option:hover {
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.ai-model-logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.ai-model-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #37352f;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .unauth-dots {
@@ -2237,4 +2436,70 @@ body:not(.unauth-mode) .unauth-bottom-quote {
     height: 48px;
     padding: 14px 28px;
   }
+}
+
+/* Sync Status Modal */
+.sync-status-modal {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  display: none;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+}
+
+.sync-status-modal.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.refresh-cw-02-parent {
+  position: relative;
+  border-radius: 99px;
+  background-color: #4c4b49;
+  border: 3px solid rgba(0, 0, 0, 0.72);
+  width: 138px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  gap: 8px;
+  text-align: center;
+  font-size: 16px;
+  color: #fff;
+  font-family: 'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.refresh-cw-02-icon {
+  height: 24px;
+  width: 24px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.refresh-cw-02-icon.rotating {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.saving {
+  position: relative;
+  line-height: 130%;
+  font-weight: 600;
+  white-space: nowrap;
 }

@@ -31,24 +31,49 @@
             class="unauth-search-input"
             placeholder="What you are looking for today?"
           />
-          <button id="unauthModelBtn" class="unauth-model-btn">
-            <span>Select the AI model</span>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M3 4.5L6 7.5L9 4.5"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
+          <div class="unauth-model-btn-wrapper">
+            <button id="unauthModelBtn" class="unauth-model-btn">
+              <span>Select the AI model</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3 4.5L6 7.5L9 4.5"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <!-- AI Model Selection Modal -->
+            <div id="aiModelModal" class="ai-model-modal ai-model-modal-hidden">
+          <div class="ai-model-dropdown">
+            <div class="ai-model-content">
+              <div class="ai-model-option" data-model="gemini">
+                <img class="ai-model-logo" src="assets/gemin_logo.svg" alt="Gemini">
+                <div class="ai-model-name">Gemini</div>
+              </div>
+              <div class="ai-model-option" data-model="openai">
+                <img class="ai-model-logo" src="assets/openai_logo.svg" alt="OpenAI">
+                <div class="ai-model-name">OpenAI</div>
+              </div>
+              <div class="ai-model-option" data-model="perplexity">
+                <img class="ai-model-logo" src="assets/perplexity_logo.svg" alt="Perplexity">
+                <div class="ai-model-name">Perplexity</div>
+              </div>
+              <div class="ai-model-option" data-model="grok">
+                <img class="ai-model-logo" src="assets/grok_logo.svg" alt="Grok">
+                <div class="ai-model-name">Grok</div>
+              </div>
+            </div>
+          </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="unauth-dots">

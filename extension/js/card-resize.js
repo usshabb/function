@@ -15,10 +15,27 @@ function startResize(cardId, e) {
     
     const startX = e.clientX;
     const startY = e.clientY;
-    const startWidth = card.width || parseInt(resizingCard.style.width);
-    const startHeight = card.height || parseInt(resizingCard.style.height);
+    
+    // Use actual rendered dimensions to prevent height jump
+    // This ensures we start from the exact current visual size
+    const startWidth = resizingCard.offsetWidth;
+    const startHeight = resizingCard.offsetHeight;
+    
+    // Capture and preserve the card's exact position
+    // Get the actual rendered position to prevent any movement
+    const cardRect = resizingCard.getBoundingClientRect();
+    const canvas = document.getElementById('canvas');
+    const canvasRect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+    const startLeft = cardRect.left - canvasRect.left;
+    const startTop = cardRect.top - canvasRect.top;
+    
+    // Explicitly set position to prevent any movement during resize
+    resizingCard.style.left = startLeft + 'px';
+    resizingCard.style.top = startTop + 'px';
     
     resizingCard.classList.add('resizing');
+    // Disable transitions during resize for immediate feedback
+    resizingCard.style.transition = 'none';
     
     function doResize(e) {
         const resizingCard = State.getResizingCard();
@@ -27,11 +44,18 @@ function startResize(cardId, e) {
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
         
+        // Allow free expansion during resize - we'll fix overlaps when resize stops
         const newWidth = Math.max(200, startWidth + deltaX);
         const newHeight = Math.max(150, startHeight + deltaY);
         
+        // Update size immediately - allow overlap during resize for better UX
+        // IMPORTANT: Keep position fixed - only change size
         resizingCard.style.width = newWidth + 'px';
         resizingCard.style.height = newHeight + 'px';
+        // Ensure position stays fixed during resize
+        resizingCard.style.left = startLeft + 'px';
+        resizingCard.style.top = startTop + 'px';
+        
         card.width = newWidth;
         card.height = newHeight;
     }
@@ -43,12 +67,24 @@ function startResize(cardId, e) {
             const cards = State.getCards();
             const card = cards.find(c => c.id === cardId);
             if (card) {
-                // Save EXACT position, width, and height after resize
-                card.x = parseInt(resizingCard.style.left) || card.x;
-                card.y = parseInt(resizingCard.style.top) || card.y;
-                card.width = parseInt(resizingCard.style.width) || card.width;
-                card.height = parseInt(resizingCard.style.height) || card.height;
+                // Get final position and dimensions
+                // Use the preserved position to ensure card doesn't move
+                const finalX = parseInt(resizingCard.style.left) || startLeft || card.x;
+                const finalY = parseInt(resizingCard.style.top) || startTop || card.y;
+                const finalWidth = parseInt(resizingCard.style.width) || card.width;
+                const finalHeight = parseInt(resizingCard.style.height) || card.height;
+                
+                // Keep the resizing card in place - move overlapping cards instead
+                // Ensure position is exactly where it started (no movement)
+                card.x = finalX;
+                card.y = finalY;
+                card.width = finalWidth;
+                card.height = finalHeight;
                 card.exactPosition = true;
+                
+                // Move any cards that overlap with the resized card
+                const hasMovedCards = moveOverlappingCards(cardId, finalX, finalY, finalWidth, finalHeight);
+                
                 console.log('✅ Card resized - saved exact dimensions:', {
                     id: card.id,
                     x: card.x,
@@ -58,9 +94,13 @@ function startResize(cardId, e) {
                 });
             }
             resizingCard.classList.remove('resizing');
-            // Don't rearrange - keep exact position and size
-            saveCards();
-            updateCanvasHeight();
+            
+            // Save changes and fix any remaining overlaps
+            setTimeout(() => {
+                fixAllOverlaps();
+                saveCards();
+                updateCanvasHeight();
+            }, 50);
         }
         State.setResizingCard(null);
         document.removeEventListener('mousemove', doResize);

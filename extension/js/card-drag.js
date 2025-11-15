@@ -13,12 +13,25 @@ function startDrag(e) {
         return;
     }
     
-    State.setDraggedCard(e.currentTarget);
+    // Only allow dragging from the drag handle (header + space above)
+    // e.currentTarget should be the drag handle, and we need to get the card element
+    const dragHandle = e.currentTarget;
+    if (!dragHandle || !dragHandle.classList.contains('card-drag-handle')) {
+        return;
+    }
+    
+    // Get the card element from the drag handle
+    const cardEl = dragHandle.closest('.card');
+    if (!cardEl) {
+        return;
+    }
+    
+    State.setDraggedCard(cardEl);
     const canvas = document.getElementById('canvas');
     if (!canvas) return;
     
     const canvasRect = canvas.getBoundingClientRect();
-    const cardRect = State.getDraggedCard().getBoundingClientRect();
+    const cardRect = cardEl.getBoundingClientRect();
     
     // Calculate offset relative to canvas, accounting for current card position
     const offset = {
@@ -28,17 +41,17 @@ function startDrag(e) {
     State.setOffset(offset);
     
     // Store initial position for reference
-    const initialLeft = parseInt(State.getDraggedCard().style.left) || 0;
-    const initialTop = parseInt(State.getDraggedCard().style.top) || 0;
-    State.getDraggedCard().dataset.initialX = initialLeft;
-    State.getDraggedCard().dataset.initialY = initialTop;
+    const initialLeft = parseInt(cardEl.style.left) || 0;
+    const initialTop = parseInt(cardEl.style.top) || 0;
+    cardEl.dataset.initialX = initialLeft;
+    cardEl.dataset.initialY = initialTop;
     
-    State.getDraggedCard().classList.add('dragging');
-    State.getDraggedCard().style.zIndex = '1000';
-    State.getDraggedCard().style.transition = 'none';
-    State.getDraggedCard().style.opacity = '0.8';
-    State.getDraggedCard().style.transform = 'rotate(2deg) scale(1.02)';
-    State.getDraggedCard().style.pointerEvents = 'none'; // Prevent interference with hover detection
+    cardEl.classList.add('dragging');
+    cardEl.style.zIndex = '1000';
+    cardEl.style.transition = 'none';
+    cardEl.style.opacity = '0.8';
+    cardEl.style.transform = 'rotate(2deg) scale(1.02)';
+    cardEl.style.pointerEvents = 'none'; // Prevent interference with hover detection
     
     // Create drop indicator
     createDropIndicator();
@@ -62,8 +75,8 @@ function drag(e) {
     // Calculate position relative to canvas, accounting for scroll
     const scrollX = window.scrollX || window.pageXOffset || 0;
     const scrollY = window.scrollY || window.pageYOffset || 0;
-    const x = e.clientX - canvasRect.left - offset.x;
-    const y = e.clientY - canvasRect.top - offset.y;
+    let x = e.clientX - canvasRect.left - offset.x;
+    let y = e.clientY - canvasRect.top - offset.y;
     
     // Ensure card doesn't go outside canvas bounds
     const cardWidth = State.getDraggedCard().offsetWidth;
@@ -73,8 +86,11 @@ function drag(e) {
     const maxX = canvasRect.width - cardWidth;
     const maxY = Math.max(canvasRect.height - cardHeight, minY);
     
-    const clampedX = Math.max(minX, Math.min(maxX, x));
-    const clampedY = Math.max(minY, Math.min(maxY, y));
+    let clampedX = Math.max(minX, Math.min(maxX, x));
+    let clampedY = Math.max(minY, Math.min(maxY, y));
+    
+    // Allow free movement during drag - overlaps will be fixed when drag stops
+    // This provides smooth, predictable dragging without unexpected jumps
     
     // Update dragged card position smoothly
     State.getDraggedCard().style.transition = 'none';
@@ -224,6 +240,26 @@ function stopDrag() {
                 targetCardData.x = tempX;
                 targetCardData.y = tempY;
                 
+                // Check if swapped positions cause overlaps
+                const draggedWidth = draggedCardData.width || getDefaultCardWidth(draggedCardData.type);
+                const draggedHeight = draggedCardData.height || getDefaultCardHeight(draggedCardData.type);
+                const targetWidth = targetCardData.width || getDefaultCardWidth(targetCardData.type);
+                const targetHeight = targetCardData.height || getDefaultCardHeight(targetCardData.type);
+                
+                // Check if dragged card at new position overlaps
+                if (checkCardOverlap(draggedCardData.x, draggedCardData.y, draggedWidth, draggedHeight, cardId)) {
+                    const validPos = findNearestMasonryPosition(draggedWidth, draggedHeight, cardId);
+                    draggedCardData.x = validPos.x;
+                    draggedCardData.y = validPos.y;
+                }
+                
+                // Check if target card at new position overlaps
+                if (checkCardOverlap(targetCardData.x, targetCardData.y, targetWidth, targetHeight, targetCardId)) {
+                    const validPos = findNearestMasonryPosition(targetWidth, targetHeight, targetCardId);
+                    targetCardData.x = validPos.x;
+                    targetCardData.y = validPos.y;
+                }
+                
                 // Update target card position
                 const targetCardEl = document.querySelector(`[data-id="${targetCardId}"]`);
                 if (targetCardEl) {
@@ -278,8 +314,9 @@ function stopDrag() {
     // Hide drop indicator
     hideDropIndicator();
     
-    // Arrange all cards in masonry to ensure no overlaps
+    // Fix any overlaps and arrange all cards in masonry to ensure no overlaps
     setTimeout(() => {
+        fixAllOverlaps();
         arrangeMasonryLayout();
         saveCards();
         updateCanvasHeight();

@@ -43,6 +43,10 @@ function renderCard(card) {
     cardEl.style.width = (card.width || getDefaultCardWidth(card.type)) + 'px';
     cardEl.style.height = (card.height || getDefaultCardHeight(card.type)) + 'px';
     
+    // Create drag handle area that includes header and space above it
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'card-drag-handle';
+    
     const header = document.createElement('div');
     header.className = 'card-header';
     
@@ -51,6 +55,8 @@ function renderCard(card) {
     // Special handling for tasks card
     if (card.type === 'tasks') {
         type.textContent = 'To Do List';
+    } else if (card.type === 'reminder') {
+        type.textContent = 'Your Calendar';
     } else {
         // Capitalize first letter for display
         type.textContent = card.type.charAt(0).toUpperCase() + card.type.slice(1);
@@ -59,8 +65,8 @@ function renderCard(card) {
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
     
-    // Use SVG for note and tasks cards, text for others
-    if (card.type === 'note' || card.type === 'tasks') {
+    // Use SVG for note, tasks, and reminder cards, text for others
+    if (card.type === 'note' || card.type === 'tasks' || card.type === 'reminder') {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('width', '20');
         svg.setAttribute('height', '20');
@@ -94,7 +100,8 @@ function renderCard(card) {
     
     header.appendChild(type);
     header.appendChild(deleteBtn);
-    cardEl.appendChild(header);
+    dragHandle.appendChild(header);
+    cardEl.appendChild(dragHandle);
     
     const content = document.createElement('div');
     content.className = 'card-content';
@@ -113,13 +120,33 @@ function renderCard(card) {
             const headerHeight = header.offsetHeight || 40;
             const cardPadding = 38; // 19px top + 19px bottom
             const textareaHeight = textarea.scrollHeight;
-            const newHeight = Math.max(143, headerHeight + cardPadding + textareaHeight);
+            let newHeight = Math.max(143, headerHeight + cardPadding + textareaHeight);
+            
+            // Get current position and dimensions
+            const currentX = card.x || 0;
+            const currentY = card.y || 0;
+            const currentWidth = card.width || getDefaultCardWidth(card.type);
+            
+            // Check if the new height would cause overlap
+            if (checkCardOverlap(currentX, currentY, currentWidth, newHeight, card.id)) {
+                // Try to find a valid position for the expanded card
+                const validPos = findNearestMasonryPosition(currentWidth, newHeight, card.id);
+                card.x = validPos.x;
+                card.y = validPos.y;
+                cardEl.style.left = validPos.x + 'px';
+                cardEl.style.top = validPos.y + 'px';
+            }
             
             // Update card height
             cardEl.style.height = newHeight + 'px';
             card.height = newHeight;
             saveCards();
             updateCanvasHeight();
+            
+            // Fix any overlaps that might have occurred
+            setTimeout(() => {
+                fixAllOverlaps();
+            }, 50);
         };
         
         textarea.addEventListener('input', (e) => {
@@ -176,7 +203,8 @@ function renderCard(card) {
         startResize(card.id, e);
     });
     
-    cardEl.addEventListener('mousedown', startDrag);
+    // Attach drag listener to drag handle (header + space above)
+    dragHandle.addEventListener('mousedown', startDrag);
     
     const canvas = document.getElementById('canvas');
     if (canvas) {
@@ -289,12 +317,13 @@ function deleteCard(cardId) {
         cardEl.remove();
     }
     
-    // Don't reset exactPosition - preserve manually positioned cards
-    // Only rearrange cards that don't have exactPosition set
-    // This keeps user's manual positioning intact
-    arrangeMasonryLayout();
-    saveCards();
-    updateCanvasHeight();
+    // Fix any overlaps and rearrange cards
+    setTimeout(() => {
+        fixAllOverlaps();
+        arrangeMasonryLayout();
+        saveCards();
+        updateCanvasHeight();
+    }, 50);
 }
 
 // Export functions for use in other modules
